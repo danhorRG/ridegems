@@ -1,0 +1,268 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Map as MapLibreMap,
+  NavigationControl,
+  Popup,
+  LngLatBounds,
+  type GeoJSONSource,
+  type MapLayerMouseEvent,
+  type MapLayerTouchEvent,
+} from "maplibre-gl";
+import type { Feature, FeatureCollection, LineString, GeoJsonProperties } from "geojson";
+import "maplibre-gl/dist/maplibre-gl.css";
+import FilterSheet from "./FilterSheet";
+import { defaultFilterState, routeMatchesFilters } from "@/lib/filters";
+import type { FilterState } from "@/lib/filters";
+import type { Route } from "@/types/route";
+
+const DIFFICULTY_COLORS: Record<string, string> = {
+  easy: "#16a34a",
+  moderate: "#f59e0b",
+  hard: "#dc2626",
+};
+
+const ROUTES_LINE_LAYER = "routes-line";
+const ROUTES_CASING_LAYER = "routes-casing";
+const ROUTES_HIT_LAYER = "routes-hit";
+const ROUTES_SOURCE = "routes";
+
+function routesToFeatureCollection(
+  routes: Route[]
+): FeatureCollection<LineString, GeoJsonProperties> {
+  return {
+    type: "FeatureCollection",
+    features: routes.map(
+      (route, index): Feature<LineString, GeoJsonProperties> => ({
+        type: "Feature",
+        id: index,
+        geometry: {
+          type: "LineString",
+          coordinates: route.coordinates,
+        },
+        properties: {
+          routeId: route.id,
+          name: route.name,
+          difficulty: route.difficulty,
+          surface: route.surface,
+          distanceKm: route.distanceKm,
+          elevationGainM: route.elevationGainM,
+        },
+      })
+    ),
+  };
+}
+
+export default function MapView({ routes }: { routes: Route[] }) {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const popupRef = useRef<Popup | null>(null);
+  const selectedFeatureId = useRef<number | null>(null);
+
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [filters, setFilters] = useState<FilterState>(() => defaultFilterState(routes));
+
+  const bounds = useMemo(() => {
+    const distances = routes.map((r) => r.distanceKm);
+    const gains = routes.map((r) => r.elevationGainM);
+    return {
+      maxDistanceKm: distances.length ? Math.max(...distances) : 0,
+      maxElevationGainM: gains.length ? Math.max(...gains) : 0,
+    };
+  }, [routes]);
+
+  const matchedRoutes = useMemo(
+    () => routes.filter((r) => routeMatchesFilters(r, filters)),
+    [routes, filters]
+  );
+
+  const featureCollection = useMemo(() => routesToFeatureCollection(routes), [routes]);
+
+  const apiKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
+
+  // Create the map once.
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current || !apiKey) return;
+
+    const map = new MapLibreMap({
+      container: mapContainerRef.current,
+      style: `https://api.maptiler.com/maps/outdoor-v2/style.json?key=${apiKey}`,
+      center: [17.1, 48.25],
+      zoom: 10,
+      attributionControl: { compact: true },
+    });
+
+    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    map.touchZoomRotate.disableRotation();
+    map.dragRotate.disable();
+
+    map.on("load", () => {
+      map.addSource(ROUTES_SOURCE, {
+        type: "geojson",
+        data: featureCollection,
+      });
+
+      map.addLayer({
+        id: ROUTES_CASING_LAYER,
+        type: "line",
+        source: ROUTES_SOURCE,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": "#ffffff",
+          "line-width": ["case", ["boolean", ["feature-state", "selected"], false], 8, 5],
+          "line-opacity": 0.9,
+        },
+      });
+
+      map.addLayer({
+        id: ROUTES_LINE_LAYER,
+        type: "line",
+        source: ROUTES_SOURCE,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": [
+            "match",
+            ["get", "difficulty"],
+            "easy",
+            DIFFICULTY_COLORS.easy,
+            "moderate",
+            DIFFICULTY_COLORS.moderate,
+            "hard",
+            DIFFICULTY_COLORS.hard,
+            "#2563eb",
+          ],
+          "line-width": ["case", ["boolean", ["feature-state", "selected"], false], 5, 3],
+        },
+      });
+
+      // Wide, invisible line purely to make routes easier to tap on touch screens.
+      map.addLayer({
+        id: ROUTES_HIT_LAYER,
+        type: "line",
+        source: ROUTES_SOURCE,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#000000", "line-width": 24, "line-opacity": 0 },
+      });
+
+      const allBounds = routes.reduce((acc, r) => {
+        acc.extend(r.bounds[0] as [number, number]);
+        acc.extend(r.bounds[1] as [number, number]);
+        return acc;
+      }, new LngLatBounds());
+      if (!allBounds.isEmpty()) {
+        map.fitBounds(allBounds, { padding: 48, duration: 0 });
+      }
+
+      const showPopup = (e: MapLayerMouseEvent | MapLayerTouchEvent) => {
+        const feature = e.features?.[0];
+        if (!feature) return;
+
+        if (selectedFeatureId.current !== null) {
+          map.setFeatureState(
+            { source: ROUTES_SOURCE, id: selectedFeatureId.current },
+            { selected: false }
+          );
+        }
+        selectedFeatureId.current = feature.id as number;
+        map.setFeatureState({ source: ROUTES_SOURCE, id: feature.id as number }, { selected: true });
+
+        popupRef.current?.remove();
+        popupRef.current = new Popup({ closeButton: true, offset: 12 })
+          .setLngLat(e.lngLat)
+          .setHTML(
+            `<div style="font:600 14px system-ui;">${String(feature.properties?.name ?? "Route")}</div>` +
+              `<div style="font:12px system-ui;color:#555;margin-top:2px;">` +
+              `${feature.properties?.distanceKm} km · ${feature.properties?.elevationGainM} m gain · ` +
+              `${String(feature.properties?.difficulty)} · ${String(feature.properties?.surface)}` +
+              `</div>`
+          )
+          .addTo(map);
+      };
+
+      map.on("click", ROUTES_HIT_LAYER, showPopup);
+      map.on("mouseenter", ROUTES_HIT_LAYER, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", ROUTES_HIT_LAYER, () => {
+        map.getCanvas().style.cursor = "";
+      });
+
+      setMapLoaded(true);
+    });
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey]);
+
+  // Keep the source data in sync if routes ever change identity.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const source = map.getSource(ROUTES_SOURCE) as GeoJSONSource | undefined;
+    source?.setData(featureCollection);
+  }, [featureCollection, mapLoaded]);
+
+  // Apply filters by hiding non-matching routes via setFilter.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    const visibleIds = matchedRoutes.map((r) => r.id);
+    for (const layerId of [ROUTES_CASING_LAYER, ROUTES_LINE_LAYER, ROUTES_HIT_LAYER]) {
+      if (map.getLayer(layerId)) {
+        map.setFilter(layerId, ["in", ["get", "routeId"], ["literal", visibleIds]]);
+      }
+    }
+  }, [matchedRoutes, mapLoaded]);
+
+  if (!apiKey) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-zinc-100 p-6 text-center dark:bg-zinc-900">
+        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+          Missing NEXT_PUBLIC_MAPTILER_KEY environment variable. Add it to .env.local and restart
+          the dev server.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={mapContainerRef} className="h-full w-full" />
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-2 p-3">
+        <div className="pointer-events-auto rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-md backdrop-blur dark:bg-zinc-900/95 dark:text-zinc-50">
+          RideGems
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setSheetOpen(true)}
+        className="absolute bottom-5 left-1/2 z-10 flex min-h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white shadow-lg active:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+      >
+        Filters
+        <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold dark:bg-black/10">
+          {matchedRoutes.length}/{routes.length}
+        </span>
+      </button>
+
+      <FilterSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        filters={filters}
+        onChange={setFilters}
+        onReset={() => setFilters(defaultFilterState(routes))}
+        bounds={bounds}
+        matchedCount={matchedRoutes.length}
+        totalCount={routes.length}
+      />
+    </div>
+  );
+}
