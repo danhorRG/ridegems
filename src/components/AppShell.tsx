@@ -1,12 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import MapView from "./MapView";
+import dynamic from "next/dynamic";
 import Sidebar from "./Sidebar";
 import { useViewportHeight } from "@/hooks/useViewportHeight";
 import { defaultFilterState, routeMatchesFilters } from "@/lib/filters";
 import type { FilterState } from "@/lib/filters";
 import type { Route } from "@/types/route";
+
+// Leaflet touches `window` at module load time, so it must never run
+// during SSR — load it client-only.
+const MapView = dynamic(() => import("./MapView"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center bg-forest-soft">
+      <span className="font-heading text-sm uppercase tracking-wider text-parchment/60">
+        Loading map&hellip;
+      </span>
+    </div>
+  ),
+});
 
 export default function AppShell({ routes }: { routes: Route[] }) {
   const viewportHeight = useViewportHeight();
@@ -48,8 +61,12 @@ export default function AppShell({ routes }: { routes: Route[] }) {
 
       {/* Positioned with absolute inset instead of flexbox so the map's
           height comes directly from this definite-height root, not from
-          a chain of flex/percentage resolution across several elements. */}
-      <div className="absolute inset-0 md:left-80 md:p-3">
+          a chain of flex/percentage resolution across several elements.
+          `isolate` gives this its own stacking context so Leaflet's
+          internal z-index values (its controls go up to z-index:1000)
+          stay contained here instead of leaking out and painting over
+          the sidebar's z-30. */}
+      <div className="absolute inset-0 isolate md:left-80 md:p-3">
         <div className="h-full w-full overflow-hidden md:rounded-xl md:ring-1 md:ring-forest-soft">
           <MapView
             routes={routes}

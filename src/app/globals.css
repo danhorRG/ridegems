@@ -27,17 +27,18 @@ body {
   color: var(--parchment);
 }
 
-/* MapLibre popup restyle to match the trail-map palette. */
-.rg-popup .maplibregl-popup-content {
+/* Leaflet popup restyle to match the trail-map palette. */
+.rg-popup .leaflet-popup-content-wrapper {
   background: var(--parchment);
   color: var(--forest);
   border-radius: 0.5rem;
-  padding: 0.75rem 0.9rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
-.rg-popup .maplibregl-popup-tip {
-  border-top-color: var(--parchment);
-  border-bottom-color: var(--parchment);
+.rg-popup .leaflet-popup-content {
+  margin: 0.75rem 0.9rem;
+}
+.rg-popup .leaflet-popup-tip {
+  background: var(--parchment);
 }
 .rg-popup-name {
   font-family: var(--font-heading);
