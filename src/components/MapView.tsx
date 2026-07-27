@@ -89,7 +89,11 @@ export default function MapView({
 
     const map = new MapLibreMap({
       container: mapContainerRef.current,
-      style: `https://api.maptiler.com/maps/outdoor-v2/style.json?key=${apiKey}`,
+      // "streets-v2" is a pure-vector style with no raster-dem/hillshade
+      // source, unlike "outdoor-v2" — Phase 1 doesn't need topographic
+      // relief shading, so this avoids that whole category of tile
+      // requests (and their bandwidth cost) outright.
+      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${apiKey}`,
       center: [17.1, 48.25],
       zoom: 10,
       attributionControl: { compact: true },
