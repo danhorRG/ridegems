@@ -13,9 +13,6 @@ import {
 } from "maplibre-gl";
 import type { Feature, FeatureCollection, LineString, GeoJsonProperties } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
-import FilterSheet from "./FilterSheet";
-import { defaultFilterState, routeMatchesFilters } from "@/lib/filters";
-import type { FilterState } from "@/lib/filters";
 import type { Route } from "@/types/route";
 
 // maplibre-gl normally locates its module worker via a bundler-resolved
@@ -25,9 +22,9 @@ import type { Route } from "@/types/route";
 setWorkerUrl("/maplibre-gl-worker.mjs");
 
 const DIFFICULTY_COLORS: Record<string, string> = {
-  easy: "#16a34a",
-  moderate: "#f59e0b",
-  hard: "#dc2626",
+  easy: "#6B8F71",
+  moderate: "#E8A33D",
+  hard: "#C1542C",
 };
 
 const ROUTES_LINE_LAYER = "routes-line";
@@ -61,29 +58,26 @@ function routesToFeatureCollection(
   };
 }
 
-export default function MapView({ routes }: { routes: Route[] }) {
+interface MapViewProps {
+  routes: Route[];
+  matchedRoutes: Route[];
+  selectedRouteId: string | null;
+  onSelectRoute: (id: string) => void;
+}
+
+export default function MapView({
+  routes,
+  matchedRoutes,
+  selectedRouteId,
+  onSelectRoute,
+}: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<Popup | null>(null);
   const selectedFeatureId = useRef<number | null>(null);
+  const lastMapOriginatedId = useRef<string | null>(null);
 
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [filters, setFilters] = useState<FilterState>(() => defaultFilterState(routes));
-
-  const bounds = useMemo(() => {
-    const distances = routes.map((r) => r.distanceKm);
-    const gains = routes.map((r) => r.elevationGainM);
-    return {
-      maxDistanceKm: distances.length ? Math.max(...distances) : 0,
-      maxElevationGainM: gains.length ? Math.max(...gains) : 0,
-    };
-  }, [routes]);
-
-  const matchedRoutes = useMemo(
-    () => routes.filter((r) => routeMatchesFilters(r, filters)),
-    [routes, filters]
-  );
 
   const featureCollection = useMemo(() => routesToFeatureCollection(routes), [routes]);
 
@@ -117,9 +111,9 @@ export default function MapView({ routes }: { routes: Route[] }) {
         source: ROUTES_SOURCE,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": "#ffffff",
+          "line-color": "#16231C",
           "line-width": ["case", ["boolean", ["feature-state", "selected"], false], 8, 5],
-          "line-opacity": 0.9,
+          "line-opacity": 0.85,
         },
       });
 
@@ -138,7 +132,7 @@ export default function MapView({ routes }: { routes: Route[] }) {
             DIFFICULTY_COLORS.moderate,
             "hard",
             DIFFICULTY_COLORS.hard,
-            "#2563eb",
+            "#E8A33D",
           ],
           "line-width": ["case", ["boolean", ["feature-state", "selected"], false], 5, 3],
         },
@@ -165,24 +159,19 @@ export default function MapView({ routes }: { routes: Route[] }) {
       const showPopup = (e: MapLayerMouseEvent | MapLayerTouchEvent) => {
         const feature = e.features?.[0];
         if (!feature) return;
+        const routeId = String(feature.properties?.routeId ?? "");
 
-        if (selectedFeatureId.current !== null) {
-          map.setFeatureState(
-            { source: ROUTES_SOURCE, id: selectedFeatureId.current },
-            { selected: false }
-          );
-        }
-        selectedFeatureId.current = feature.id as number;
-        map.setFeatureState({ source: ROUTES_SOURCE, id: feature.id as number }, { selected: true });
+        lastMapOriginatedId.current = routeId;
+        onSelectRoute(routeId);
 
         popupRef.current?.remove();
-        popupRef.current = new Popup({ closeButton: true, offset: 12 })
+        popupRef.current = new Popup({ closeButton: true, offset: 12, className: "rg-popup" })
           .setLngLat(e.lngLat)
           .setHTML(
-            `<div style="font:600 14px system-ui;">${String(feature.properties?.name ?? "Route")}</div>` +
-              `<div style="font:12px system-ui;color:#555;margin-top:2px;">` +
-              `${feature.properties?.distanceKm} km · ${feature.properties?.elevationGainM} m gain · ` +
-              `${String(feature.properties?.difficulty)} · ${String(feature.properties?.surface)}` +
+            `<div class="rg-popup-name">${String(feature.properties?.name ?? "Route")}</div>` +
+              `<div class="rg-popup-stats">` +
+              `${feature.properties?.distanceKm} km &middot; ${feature.properties?.elevationGainM} m gain &middot; ` +
+              `${String(feature.properties?.difficulty)} &middot; ${String(feature.properties?.surface)}` +
               `</div>`
           )
           .addTo(map);
@@ -208,6 +197,19 @@ export default function MapView({ routes }: { routes: Route[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey]);
 
+  // Force MapLibre to re-measure its canvas whenever the container's actual
+  // size changes — defensive against the container reporting zero height
+  // at the moment the map was constructed (e.g. during layout transitions).
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
   // Keep the source data in sync if routes ever change identity.
   useEffect(() => {
     const map = mapRef.current;
@@ -228,10 +230,38 @@ export default function MapView({ routes }: { routes: Route[] }) {
     }
   }, [matchedRoutes, mapLoaded]);
 
+  // Reflect external selection (e.g. a sidebar route card) on the map:
+  // highlight the matching line, and fly to it unless the selection just
+  // originated from clicking that same line on the map.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    if (selectedFeatureId.current !== null) {
+      map.setFeatureState({ source: ROUTES_SOURCE, id: selectedFeatureId.current }, { selected: false });
+      selectedFeatureId.current = null;
+    }
+
+    const originatedFromMapClick = lastMapOriginatedId.current === selectedRouteId;
+    lastMapOriginatedId.current = null;
+
+    if (!selectedRouteId) return;
+    const index = routes.findIndex((r) => r.id === selectedRouteId);
+    if (index === -1) return;
+
+    selectedFeatureId.current = index;
+    map.setFeatureState({ source: ROUTES_SOURCE, id: index }, { selected: true });
+
+    if (!originatedFromMapClick) {
+      const route = routes[index];
+      map.fitBounds(route.bounds, { padding: 64, maxZoom: 15 });
+    }
+  }, [selectedRouteId, mapLoaded, routes]);
+
   if (!apiKey) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-zinc-100 p-6 text-center dark:bg-zinc-900">
-        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+      <div className="flex h-full w-full items-center justify-center bg-forest-soft p-6 text-center">
+        <p className="text-sm text-parchment/80">
           Missing NEXT_PUBLIC_MAPTILER_KEY environment variable. Add it to .env.local and restart
           the dev server.
         </p>
@@ -239,37 +269,5 @@ export default function MapView({ routes }: { routes: Route[] }) {
     );
   }
 
-  return (
-    <div className="relative h-full w-full">
-      <div ref={mapContainerRef} className="h-full w-full" />
-
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-2 p-3">
-        <div className="pointer-events-auto rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-zinc-900 shadow-md backdrop-blur dark:bg-zinc-900/95 dark:text-zinc-50">
-          RideGems
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setSheetOpen(true)}
-        className="absolute bottom-5 left-1/2 z-10 flex min-h-12 -translate-x-1/2 items-center gap-2 rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white shadow-lg active:bg-zinc-700 dark:bg-white dark:text-zinc-900"
-      >
-        Filters
-        <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold dark:bg-black/10">
-          {matchedRoutes.length}/{routes.length}
-        </span>
-      </button>
-
-      <FilterSheet
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        filters={filters}
-        onChange={setFilters}
-        onReset={() => setFilters(defaultFilterState(routes))}
-        bounds={bounds}
-        matchedCount={matchedRoutes.length}
-        totalCount={routes.length}
-      />
-    </div>
-  );
+  return <div ref={mapContainerRef} className="h-full w-full" />;
 }
