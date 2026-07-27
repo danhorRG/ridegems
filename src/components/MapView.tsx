@@ -87,6 +87,11 @@ export default function MapView({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current || !apiKey) return;
 
+    console.log(
+      "[RideGems] container rect before map init:",
+      mapContainerRef.current.getBoundingClientRect()
+    );
+
     const map = new MapLibreMap({
       container: mapContainerRef.current,
       // "streets-v2" is a pure-vector style with no raster-dem/hillshade
@@ -99,11 +104,35 @@ export default function MapView({
       attributionControl: { compact: true },
     });
 
+    map.on("error", (e) => {
+      console.error("[RideGems] maplibre error event:", e.error ?? e);
+    });
+
+    map.once("idle", () => {
+      console.log("[RideGems] map idle (first time). canvas size:", {
+        width: map.getCanvas().width,
+        height: map.getCanvas().height,
+        styleWidth: map.getCanvas().style.width,
+        styleHeight: map.getCanvas().style.height,
+      });
+    });
+
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     map.touchZoomRotate.disableRotation();
     map.dragRotate.disable();
 
     map.on("load", () => {
+      console.log("[RideGems] load event fired.", {
+        containerRect: mapContainerRef.current?.getBoundingClientRect(),
+        canvasWidth: map.getCanvas().width,
+        canvasHeight: map.getCanvas().height,
+        canvasStyleWidth: map.getCanvas().style.width,
+        canvasStyleHeight: map.getCanvas().style.height,
+        isStyleLoaded: map.isStyleLoaded(),
+        zoom: map.getZoom(),
+        center: map.getCenter(),
+      });
+
       map.addSource(ROUTES_SOURCE, {
         type: "geojson",
         data: featureCollection,
@@ -156,8 +185,18 @@ export default function MapView({
         acc.extend(r.bounds[1] as [number, number]);
         return acc;
       }, new LngLatBounds());
+      console.log("[RideGems] computed route bounds:", {
+        isEmpty: allBounds.isEmpty(),
+        bounds: allBounds.isEmpty() ? null : allBounds.toArray(),
+      });
       if (!allBounds.isEmpty()) {
         map.fitBounds(allBounds, { padding: 48, duration: 0 });
+        console.log("[RideGems] after fitBounds:", {
+          zoom: map.getZoom(),
+          center: map.getCenter(),
+          canvasWidth: map.getCanvas().width,
+          canvasHeight: map.getCanvas().height,
+        });
       }
 
       const showPopup = (e: MapLayerMouseEvent | MapLayerTouchEvent) => {
@@ -207,7 +246,9 @@ export default function MapView({
   useEffect(() => {
     const container = mapContainerRef.current;
     if (!container) return;
-    const observer = new ResizeObserver(() => {
+    const observer = new ResizeObserver((entries) => {
+       
+      console.log("[RideGems] ResizeObserver fired:", entries[0]?.contentRect);
       mapRef.current?.resize();
     });
     observer.observe(container);
