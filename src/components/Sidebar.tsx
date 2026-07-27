@@ -43,7 +43,7 @@ export default function Sidebar({
       />
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden rounded-t-2xl bg-parchment shadow-[0_-8px_30px_rgba(0,0,0,0.4)] transition-[max-height] duration-200 ease-out md:static md:z-auto md:h-full md:w-80 md:max-h-none md:flex-shrink-0 md:rounded-none md:shadow-none ${
+        className={`fixed inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden rounded-t-2xl bg-parchment shadow-[0_-8px_30px_rgba(0,0,0,0.4)] transition-[max-height] duration-200 ease-out md:absolute md:inset-y-0 md:left-0 md:right-auto md:bottom-auto md:z-auto md:h-auto md:w-80 md:max-h-none md:rounded-none md:shadow-none ${
           open ? "max-h-[85vh]" : "max-h-[76px]"
         }`}
       >

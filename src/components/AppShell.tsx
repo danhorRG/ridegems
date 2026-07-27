@@ -30,7 +30,7 @@ export default function AppShell({ routes }: { routes: Route[] }) {
 
   return (
     <div
-      className="flex w-full flex-col overflow-hidden bg-forest md:flex-row"
+      className="relative w-full overflow-hidden bg-forest"
       style={{ height: viewportHeight ? `${viewportHeight}px` : "100dvh" }}
     >
       <Sidebar
@@ -46,7 +46,10 @@ export default function AppShell({ routes }: { routes: Route[] }) {
         onOpenChange={setSheetOpen}
       />
 
-      <main className="relative min-h-0 w-full flex-1 md:p-3">
+      {/* Positioned with absolute inset instead of flexbox so the map's
+          height comes directly from this definite-height root, not from
+          a chain of flex/percentage resolution across several elements. */}
+      <div className="absolute inset-0 md:left-80 md:p-3">
         <div className="h-full w-full overflow-hidden md:rounded-xl md:ring-1 md:ring-forest-soft">
           <MapView
             routes={routes}
@@ -55,7 +58,7 @@ export default function AppShell({ routes }: { routes: Route[] }) {
             onSelectRoute={setSelectedRouteId}
           />
         </div>
-      </main>
+      </div>
     </div>
   );
 }
