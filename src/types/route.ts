@@ -2,6 +2,7 @@ import type { ElevationProfilePoint, LngLatBounds } from "@/lib/geo";
 
 export type Difficulty = "easy" | "moderate" | "hard";
 export type Surface = "paved" | "gravel" | "mixed";
+export type PoiCategory = "viewpoint" | "water" | "food" | "hazard" | "other";
 
 export interface Route {
   id: string;
@@ -17,4 +18,22 @@ export interface Route {
   /** Simplified [lon, lat] line used for map rendering. */
   coordinates: [number, number][];
   bounds: LngLatBounds;
+}
+
+export interface RoutePhoto {
+  url: string;
+  caption: string | null;
+}
+
+export interface RoutePoi {
+  name: string;
+  description: string | null;
+  category: PoiCategory;
+  lat: number;
+  lon: number;
+}
+
+export interface RouteDetail extends Route {
+  photos: RoutePhoto[];
+  pois: RoutePoi[];
 }

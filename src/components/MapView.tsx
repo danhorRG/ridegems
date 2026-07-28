@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef } from "react";
+import Link from "next/link";
 import { MapContainer, TileLayer, Polyline, Popup, ZoomControl, useMap } from "react-leaflet";
 import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -176,6 +177,9 @@ export default function MapView({
                   {route.distanceKm} km &middot; {route.elevationGainM} m gain &middot;{" "}
                   {route.difficulty} &middot; {route.surface}
                 </div>
+                <Link href={`/route/${route.id}`} className="rg-popup-link">
+                  View details &rarr;
+                </Link>
               </Popup>
             </Polyline>
           </Fragment>

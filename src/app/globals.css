@@ -53,3 +53,16 @@ body {
   color: var(--forest-soft);
   margin-top: 0.2rem;
 }
+.rg-popup-link {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-family: var(--font-stats);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--amber-hover);
+}
+.rg-popup-link:hover {
+  text-decoration: underline;
+}
