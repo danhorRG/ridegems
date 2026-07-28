@@ -90,9 +90,8 @@ export default function SubmitPage() {
           map.
         </p>
         <p className="mt-1 text-xs text-parchment/40">
-          GPX file and photos combined must stay under 4MB total — a hosting platform limit, not
-          ours. Most GPX exports are fine on their own; phone photos (often 3–8MB each) are the
-          usual culprit, so resize or drop a couple if you hit the limit.
+          GPX + photos: 4MB max combined. Phone photos are usually the culprit — resize or drop a
+          couple if you hit the limit.
         </p>
 
         {(clientError || (state.status === "error" && state.message)) && (
