@@ -6,6 +6,11 @@ import { submitRouteAction, type SubmitFormState } from "./actions";
 
 const initialState: SubmitFormState = { status: "idle" };
 
+// Vercel hard-caps request bodies at 4.5MB and our Server Action config
+// allows 4MB; check client-side against a slightly lower threshold so
+// there's room for the other form fields and multipart overhead.
+const MAX_TOTAL_BYTES = 3.8 * 1024 * 1024;
+
 const inputClass =
   "w-full rounded-lg border border-parchment/20 bg-forest-soft px-3 py-2 text-sm text-parchment placeholder:text-parchment/40 focus:border-amber focus:outline-none";
 
@@ -23,6 +28,27 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function SubmitPage() {
   const [state, formAction, pending] = useActionState(submitRouteAction, initialState);
   const [whyLength, setWhyLength] = useState(0);
+  const [clientError, setClientError] = useState<string | null>(null);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    const form = e.currentTarget;
+    const gpxInput = form.elements.namedItem("gpx") as HTMLInputElement;
+    const photosInput = form.elements.namedItem("photos") as HTMLInputElement;
+
+    const gpxBytes = gpxInput.files?.[0]?.size ?? 0;
+    const photoBytes = Array.from(photosInput.files ?? []).reduce((sum, f) => sum + f.size, 0);
+    const totalBytes = gpxBytes + photoBytes;
+
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      e.preventDefault();
+      const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
+      setClientError(
+        `GPX file and photos add up to ${totalMB}MB, which is over the 4MB combined limit. Remove or resize a photo and try again.`
+      );
+      return;
+    }
+    setClientError(null);
+  }
 
   if (state.status === "success") {
     return (
@@ -63,14 +89,19 @@ export default function SubmitPage() {
           Share a route you&apos;ve actually ridden. It&apos;ll be reviewed before it appears on the
           map.
         </p>
+        <p className="mt-1 text-xs text-parchment/40">
+          GPX file and photos combined must stay under 4MB total — a hosting platform limit, not
+          ours. Most GPX exports are fine on their own; phone photos (often 3–8MB each) are the
+          usual culprit, so resize or drop a couple if you hit the limit.
+        </p>
 
-        {state.status === "error" && state.message && (
+        {(clientError || (state.status === "error" && state.message)) && (
           <div className="mt-6 rounded-lg border border-rust/50 bg-rust/10 px-4 py-3 text-sm text-parchment">
-            {state.message}
+            {clientError ?? state.message}
           </div>
         )}
 
-        <form action={formAction} className="mt-6 flex flex-col gap-5 pb-12">
+        <form action={formAction} onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5 pb-12">
           <Field label="Route name">
             <input name="name" type="text" required maxLength={120} className={inputClass} />
           </Field>
