@@ -1,9 +1,14 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import ElevationProfileChart from "@/components/ElevationProfileChart";
+import PhotoGallery from "@/components/PhotoGallery";
+import RecommendButton from "@/components/RecommendButton";
+import RouteDetailInteractive from "@/components/RouteDetailInteractive";
 import { getRouteBySlug } from "@/lib/routes";
 import type { PoiCategory } from "@/types/route";
+
+function formatCommentDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
 
 export const revalidate = 60;
 
@@ -59,6 +64,10 @@ export default async function RouteDetailPage({
           </span>
         </div>
 
+        <div className="mt-3">
+          <RecommendButton initialCount={route.recommendationCount} />
+        </div>
+
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Distance" value={`${route.distanceKm.toFixed(1)} km`} />
           <Stat label="Elevation gain" value={`${route.elevationGainM} m`} />
@@ -66,44 +75,65 @@ export default async function RouteDetailPage({
           <Stat label="Surface" value={route.surface} />
         </div>
 
-        <div className="mt-8 rounded-xl bg-parchment p-4 sm:p-5">
-          <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-forest/70">
-            Elevation profile
-          </h2>
-          <div className="mt-3">
-            <ElevationProfileChart
-              profile={route.profile}
-              minElevationM={route.minElevationM}
-              maxElevationM={route.maxElevationM}
-              distanceKm={route.distanceKm}
-            />
+        {route.whyRecommended && (
+          <div className="mt-6 rounded-xl border border-amber/40 bg-amber/10 px-4 py-3.5 sm:px-5">
+            <h2 className="font-heading text-xs font-semibold uppercase tracking-wider text-amber-hover">
+              Why this route made the cut
+            </h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-parchment/90">{route.whyRecommended}</p>
           </div>
-        </div>
+        )}
+
+        <RouteDetailInteractive track={route.track} />
+
+        {route.highlights.length > 0 && (
+          <div className="mt-8">
+            <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-parchment/70">
+              About this route
+            </h2>
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {route.highlights.map((highlight) => (
+                <li key={highlight} className="flex items-start gap-2.5 text-sm text-parchment/80">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber" />
+                  {highlight}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-8">
           <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-parchment/70">
             Photos
           </h2>
-          {route.photos.length === 0 ? (
-            <p className="mt-2 text-sm text-parchment/50">No photos yet.</p>
+          <PhotoGallery photos={route.photos} routeName={route.name} />
+        </div>
+
+        <div className="mt-8">
+          <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-parchment/70">
+            Trip reports
+          </h2>
+          {route.comments.length === 0 ? (
+            <p className="mt-2 text-sm text-parchment/50">No trip reports yet.</p>
           ) : (
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {route.photos.map((photo, i) => (
-                <div
-                  key={photo.url}
-                  className="relative aspect-square w-full overflow-hidden rounded-lg bg-forest-soft"
+            <ul className="mt-3 flex flex-col gap-2.5">
+              {route.comments.map((comment) => (
+                <li
+                  key={`${comment.authorName}-${comment.createdAt}`}
+                  className="rounded-lg border border-parchment/15 px-3.5 py-3"
                 >
-                  <Image
-                    src={photo.url}
-                    alt={photo.caption ?? route.name}
-                    fill
-                    sizes="(min-width: 640px) 33vw, 50vw"
-                    className="object-cover"
-                    priority={i === 0}
-                  />
-                </div>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-heading text-xs font-semibold uppercase tracking-wide text-parchment">
+                      {comment.authorName}
+                    </span>
+                    <span className="font-stats text-[0.65rem] text-parchment/40">
+                      {formatCommentDate(comment.createdAt)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm leading-relaxed text-parchment/80">{comment.body}</p>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
 

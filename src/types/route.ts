@@ -1,4 +1,4 @@
-import type { ElevationProfilePoint, LngLatBounds } from "@/lib/geo";
+import type { ElevationProfilePoint, LngLatBounds, TrackPoint } from "@/lib/geo";
 
 export type Difficulty = "easy" | "moderate" | "hard";
 export type Surface = "paved" | "gravel" | "mixed";
@@ -33,7 +33,18 @@ export interface RoutePoi {
   lon: number;
 }
 
+export interface RouteComment {
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface RouteDetail extends Route {
+  whyRecommended: string;
+  highlights: string[];
+  track: TrackPoint[];
   photos: RoutePhoto[];
   pois: RoutePoi[];
+  recommendationCount: number;
+  comments: RouteComment[];
 }

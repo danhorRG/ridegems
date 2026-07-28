@@ -59,6 +59,10 @@ async function main() {
           coordinates: route.coordinates,
           profile: route.profile,
           bounds: route.bounds,
+          why_recommended: route.whyRecommended,
+          highlights: route.highlights,
+          track_points: route.track,
+          recommendation_count: route.recommendationCount,
         },
         { onConflict: "slug" }
       )
@@ -70,6 +74,24 @@ async function main() {
       continue;
     }
     console.log("  route row ok:", upserted.id);
+
+    // Re-inserting comments is idempotent the same way photos are.
+    await supabase.from("route_comments").delete().eq("route_id", upserted.id);
+    if (route.comments.length > 0) {
+      const { error: commentsError } = await supabase.from("route_comments").insert(
+        route.comments.map((comment) => ({
+          route_id: upserted.id,
+          author_name: comment.authorName,
+          body: comment.body,
+          created_at: comment.createdAt,
+        }))
+      );
+      if (commentsError) {
+        console.error("  comments insert failed:", commentsError.message);
+      } else {
+        console.log(`  comments ok: ${route.comments.length}`);
+      }
+    }
 
     const files = photosForSlug(route.id);
     if (files.length === 0) {

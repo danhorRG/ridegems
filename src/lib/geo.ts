@@ -109,6 +109,48 @@ export function computeTrackStats(
   };
 }
 
+export interface TrackPoint extends ElevationProfilePoint {
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Like the `profile` array in computeTrackStats, but keeps lat/lon per point
+ * too, so a single index maps a distance/elevation to a map position. Used
+ * to sync the route detail page's map hover with its elevation chart hover.
+ */
+export function buildTrackPoints(points: RawTrackPoint[], maxPoints = 300): TrackPoint[] {
+  if (points.length === 0) return [];
+
+  const cumulativeDistanceM: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    cumulativeDistanceM.push(
+      cumulativeDistanceM[i - 1] + haversineMeters(points[i - 1], points[i])
+    );
+  }
+
+  const step = Math.max(1, Math.floor(points.length / maxPoints));
+  const track: TrackPoint[] = [];
+  for (let i = 0; i < points.length; i += step) {
+    track.push({
+      lat: points[i].lat,
+      lon: points[i].lon,
+      distanceKm: cumulativeDistanceM[i] / 1000,
+      elevationM: Math.round(points[i].ele),
+    });
+  }
+  const last = points.length - 1;
+  if (track[track.length - 1]?.distanceKm !== cumulativeDistanceM[last] / 1000) {
+    track.push({
+      lat: points[last].lat,
+      lon: points[last].lon,
+      distanceKm: cumulativeDistanceM[last] / 1000,
+      elevationM: Math.round(points[last].ele),
+    });
+  }
+  return track;
+}
+
 type LonLat = [number, number];
 
 /**

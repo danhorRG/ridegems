@@ -50,6 +50,10 @@ export async function getRoutes(): Promise<Route[]> {
 }
 
 interface RouteDetailRow extends RouteRow {
+  why_recommended: string | null;
+  highlights: string[];
+  track_points: RouteDetail["track"];
+  recommendation_count: number;
   route_photos: { url: string; caption: string | null }[];
   route_pois: {
     name: string;
@@ -58,16 +62,21 @@ interface RouteDetailRow extends RouteRow {
     lat: number;
     lon: number;
   }[];
+  route_comments: { author_name: string; body: string; created_at: string }[];
 }
+
+const ROUTE_DETAIL_COLUMNS =
+  `${ROUTE_COLUMNS}, why_recommended, highlights, track_points, recommendation_count, ` +
+  "route_photos(url,caption), route_pois(name,description,category,lat,lon), " +
+  "route_comments(author_name,body,created_at)";
 
 export async function getRouteBySlug(slug: string): Promise<RouteDetail | null> {
   const { data, error } = await supabase
     .from("routes")
-    .select(
-      `${ROUTE_COLUMNS}, route_photos(url,caption), route_pois(name,description,category,lat,lon)`
-    )
+    .select(ROUTE_DETAIL_COLUMNS)
     .eq("slug", slug)
     .order("sort_order", { referencedTable: "route_photos" })
+    .order("created_at", { referencedTable: "route_comments", ascending: false })
     .maybeSingle();
 
   if (error) {
@@ -78,10 +87,19 @@ export async function getRouteBySlug(slug: string): Promise<RouteDetail | null> 
   const row = data as unknown as RouteDetailRow;
   return {
     ...rowToRoute(row),
+    whyRecommended: row.why_recommended ?? "",
+    highlights: row.highlights,
+    track: row.track_points,
+    recommendationCount: row.recommendation_count,
     photos: row.route_photos,
     pois: row.route_pois.map((poi) => ({
       ...poi,
       category: poi.category as PoiCategory,
+    })),
+    comments: row.route_comments.map((c) => ({
+      authorName: c.author_name,
+      body: c.body,
+      createdAt: c.created_at,
     })),
   };
 }
