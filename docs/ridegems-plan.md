@@ -57,7 +57,7 @@ Move routes into Supabase. Build the route detail page: elevation profile chart,
 - **Auth (minimal, set up now not in Phase 4):** basic Supabase auth (e.g. email login, no UI polish needed yet) so that every route/submission/comment/recommend created from this point on already has a `user_id` attached. Retrofitting ownership onto existing rows later is much messier than setting this up while the database itself is being built.
 
 **Phase 3 — Submission flow**
-GPX upload form: parse the file, auto-calculate distance/elevation/profile, let the user add description, photos, difficulty/surface tags. **Mandatory field: "Why does this route deserve a spot in the library?"** — short, concise, character-limited (e.g. 200 chars) — required before the form can be submitted, so every route arrives with a stated reason for inclusion. Maybe a simple "pending review" state before a route goes public, so quality stays high.
+GPX upload form: parse the file, auto-calculate distance/elevation/profile, let the user add description, photos, difficulty/surface tags. **Mandatory field: "Why does this route made the cut?"** — short, concise, character-limited (e.g. 200 chars) — required before the form can be submitted, so every route arrives with a stated reason for inclusion. Maybe a simple "pending review" state before a route goes public, so quality stays high.
 
 **Phase 4 — Community features**
 - GPX export/download button

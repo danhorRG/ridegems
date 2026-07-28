@@ -40,6 +40,7 @@ export interface RouteComment {
 }
 
 export interface RouteDetail extends Route {
+  description: string | null;
   whyRecommended: string;
   highlights: string[];
   track: TrackPoint[];

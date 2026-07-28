@@ -84,6 +84,17 @@ export default async function RouteDetailPage({
           </div>
         )}
 
+        {route.description && (
+          <div className="mt-6">
+            <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-parchment/70">
+              Description
+            </h2>
+            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-parchment/80">
+              {route.description}
+            </p>
+          </div>
+        )}
+
         <RouteDetailInteractive track={route.track} />
 
         {route.highlights.length > 0 && (

@@ -16,6 +16,7 @@ interface SampleRouteMeta {
   file: string;
   /** GPX has no surface data — set by hand based on the route's real-world surface. */
   surface: Surface;
+  description: string;
   /** Placeholder quality-gate blurb until the real submission form (Phase 3) collects this. */
   whyRecommended: string;
   highlights: string[];
@@ -28,6 +29,8 @@ const SAMPLE_ROUTES: SampleRouteMeta[] = [
   {
     file: "Javornik_z_Limbachu.gpx",
     surface: "paved",
+    description:
+      "A gentle out-and-back through the vineyards west of Bratislava, following farm roads and quiet asphalt lanes past Limbach and Svätý Jur. One short, punchy climb around the halfway mark is the only real effort on an otherwise relaxed route — the rest is rolling hills through wine country, with a well-earned stop at a local buffet before the return leg.",
     whyRecommended:
       "A friendly loop through vineyard country west of Bratislava — quiet backroads, one short climb with a big payoff view, and a buffet at the halfway point worth the stop alone.",
     highlights: [
@@ -58,6 +61,8 @@ const SAMPLE_ROUTES: SampleRouteMeta[] = [
   {
     file: "Karpaty (1).gpx",
     surface: "paved",
+    description:
+      "The defining climb of the Small Carpathians, straight out of Bratislava's northern suburbs and up into forested switchbacks. Gradients stay honest rather than brutal, but the sustained length adds up — most riders treat this as a training staple rather than a casual outing. The reward is a ridge-line stretch with open views back over the city, before a fast, technical descent brings you back down.",
     whyRecommended:
       "The classic Small Carpathians test piece — steady climbing through forest switchbacks rewards you with one of the best ridge-line views near Bratislava. A local favorite for weekend training.",
     highlights: [
@@ -88,6 +93,8 @@ const SAMPLE_ROUTES: SampleRouteMeta[] = [
   {
     file: "Nojzidl.gpx",
     surface: "paved",
+    description:
+      "A long, flat cross-border run east from Bratislava into Austria, finishing near Neusiedl am See. Roads stay smooth and traffic light throughout, making this one of the most approachable long rides in the area — a good target for a first century, or simply a full day in the saddle at a conversational pace with friends.",
     whyRecommended:
       "A long, flat cross-border ride out toward Neusiedl am See — ideal for an all-day social pace, smooth roads throughout, and lake views for the final stretch. Great for beginners.",
     highlights: [
@@ -142,6 +149,7 @@ function toComments(samples: SampleComment[]): RouteComment[] {
 }
 
 export interface SampleRoute extends Route {
+  description: string;
   whyRecommended: string;
   highlights: string[];
   track: TrackPoint[];
@@ -153,7 +161,7 @@ export function getSampleRoutesFromGpx(): SampleRoute[] {
   const dataDir = path.join(process.cwd(), "sample-data");
 
   return SAMPLE_ROUTES.map(
-    ({ file, surface, whyRecommended, highlights, recommendationCount, comments }) => {
+    ({ file, surface, description, whyRecommended, highlights, recommendationCount, comments }) => {
       if (whyRecommended.length > 200) {
         throw new Error(`whyRecommended for ${file} exceeds 200 characters`);
       }
@@ -183,6 +191,7 @@ export function getSampleRoutesFromGpx(): SampleRoute[] {
         profile: stats.profile,
         coordinates,
         bounds: boundsOf(coordinates),
+        description,
         whyRecommended,
         highlights,
         track: buildTrackPoints(parsed.points),

@@ -59,10 +59,12 @@ async function main() {
           coordinates: route.coordinates,
           profile: route.profile,
           bounds: route.bounds,
+          description: route.description,
           why_recommended: route.whyRecommended,
           highlights: route.highlights,
           track_points: route.track,
           recommendation_count: route.recommendationCount,
+          status: "published",
         },
         { onConflict: "slug" }
       )
