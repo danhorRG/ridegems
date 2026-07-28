@@ -86,8 +86,8 @@ export default function SubmitPage() {
           Submit a route
         </h1>
         <p className="mt-2 text-sm text-parchment/70">
-          Share a route you&apos;ve actually ridden. It&apos;ll be reviewed before it appears on the
-          map.
+          Share a route you&apos;ve actually ridden — help build a collection where every ride
+          comes with real local know-how, wherever you go.
         </p>
         <p className="mt-1 text-xs text-parchment/40">
           GPX + photos: 4MB max combined. Phone photos are usually the culprit — resize or drop a
