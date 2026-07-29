@@ -114,6 +114,37 @@ export interface TrackPoint extends ElevationProfilePoint {
   lon: number;
 }
 
+export interface ElevationStats {
+  elevationGainM: number;
+  elevationLossM: number;
+  minElevationM: number;
+  maxElevationM: number;
+  profile: ElevationProfilePoint[];
+}
+
+/**
+ * Recomputes gain/loss/min/max/profile from a track's elevations — used
+ * after replacing GPX-reported elevation with looked-up terrain elevation
+ * (see src/lib/elevation.ts), so every downstream number is derived from
+ * the same corrected data instead of the original noisy GPX values.
+ */
+export function statsFromTrack(track: TrackPoint[]): ElevationStats {
+  if (track.length === 0) {
+    return { elevationGainM: 0, elevationLossM: 0, minElevationM: 0, maxElevationM: 0, profile: [] };
+  }
+
+  const elevations = track.map((p) => p.elevationM);
+  const { gain, loss } = computeElevationGainLoss(elevations);
+
+  return {
+    elevationGainM: Math.round(gain),
+    elevationLossM: Math.round(loss),
+    minElevationM: Math.round(Math.min(...elevations)),
+    maxElevationM: Math.round(Math.max(...elevations)),
+    profile: track.map(({ distanceKm, elevationM }) => ({ distanceKm, elevationM })),
+  };
+}
+
 /**
  * Like the `profile` array in computeTrackStats, but keeps lat/lon per point
  * too, so a single index maps a distance/elevation to a map position. Used

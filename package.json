@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "migrate:routes": "tsx --env-file=.env.local scripts/migrate-routes.ts"
+    "migrate:routes": "tsx --env-file=.env.local scripts/migrate-routes.ts",
+    "recompute-elevation": "tsx --env-file=.env.local scripts/recompute-elevation.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",

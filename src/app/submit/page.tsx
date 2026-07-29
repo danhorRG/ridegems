@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { submitRoutePayload, type SubmitFormState } from "./actions";
 import { parseGpx } from "@/lib/gpx";
-import { buildTrackPoints, computeTrackStats, simplifyLine, boundsOf } from "@/lib/geo";
+import { buildTrackPoints, simplifyLine, boundsOf, statsFromTrack } from "@/lib/geo";
+import { fetchElevations } from "@/lib/elevation";
 import { supabase } from "@/lib/supabase";
 
 const initialState: SubmitFormState = { status: "idle" };
@@ -94,11 +95,30 @@ export default function SubmitPage() {
         return;
       }
 
-      const stats = computeTrackStats(parsed.points);
       const fullLine: [number, number][] = parsed.points.map((p) => [p.lon, p.lat]);
       const coordinates = simplifyLine(fullLine, 6);
-      const track = buildTrackPoints(parsed.points);
       const bounds = boundsOf(coordinates);
+
+      // GPX-reported elevation (GPS/barometric) is noisy and occasionally
+      // spikes by hundreds of meters on a single point. Replace it with
+      // real terrain elevation looked up by coordinate, falling back to
+      // the GPX's own values only if the lookup fails.
+      let track = buildTrackPoints(parsed.points);
+      const apiKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
+      if (apiKey) {
+        try {
+          const elevations = await fetchElevations(
+            track.map((p) => ({ lon: p.lon, lat: p.lat })),
+            apiKey
+          );
+          track = track.map((p, i) => ({ ...p, elevationM: Math.round(elevations[i]) }));
+        } catch (err) {
+          console.warn("Elevation lookup failed, using GPX-reported elevation instead.", err);
+        }
+      }
+
+      const stats = statsFromTrack(track);
+      const distanceKm = track[track.length - 1]?.distanceKm ?? 0;
 
       // Uploaded directly to Supabase Storage from the browser — never
       // passes through our server, so it isn't subject to Vercel's request
@@ -125,7 +145,7 @@ export default function SubmitPage() {
         difficulty: String(formData.get("difficulty") ?? ""),
         surface: String(formData.get("surface") ?? ""),
         whyRecommended: String(formData.get("whyRecommended") ?? ""),
-        distanceKm: stats.distanceKm,
+        distanceKm,
         elevationGainM: stats.elevationGainM,
         elevationLossM: stats.elevationLossM,
         minElevationM: stats.minElevationM,
