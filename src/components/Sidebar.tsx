@@ -123,6 +123,13 @@ export default function Sidebar({
               />
             ))}
           </div>
+
+          <Link
+            href="/about"
+            className="mt-2 block text-center text-[0.7rem] uppercase tracking-wide text-forest/40 hover:text-forest/70"
+          >
+            About RideGems
+          </Link>
         </div>
       </div>
     </>
