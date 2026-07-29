@@ -17,13 +17,22 @@ export default function AboutPage() {
 
         <div className="mt-6 flex flex-col gap-4 text-sm leading-relaxed text-parchment/80 sm:text-base">
           <p>
-            Anyone who&apos;s cycled somewhere new with a local knows the difference it makes —
-            the route that avoids the busy road, the climb that&apos;s actually worth the effort,
-            the café at just the right distance. RideGems exists to collect that kind of knowledge
-            in one place: routes recommended by people who&apos;ve actually ridden them, not GPS
-            tracks dumped without context.
+            Finding good routes in a new area shouldn&apos;t mean digging through hundreds of
+            random GPS logs.
           </p>
-          <p>Every route here comes from someone who rode it, thought it was worth sharing, and said why.</p>
+          <p>
+            Anyone who&apos;s ridden with a local knows the difference: knowing which side of the
+            climb to take, which descent to enjoy, or where a quick detour pays off with a great
+            view or a proper coffee. RideGems is a community-driven collection of those exact
+            routes. No noise, no random commutes — just proven rides shared by cyclists who know
+            the area best.
+          </p>
+          <p>
+            If you have a favorite local loop that deserves to be on the map, share it. And if
+            you&apos;ve ridden one of the routes here, leave a quick update — fresh condition
+            reports, road closures, or new spots make the collection even more valuable.
+          </p>
+          <p>Together, we can build a truly useful guide for everyone.</p>
         </div>
       </div>
     </div>
