@@ -265,3 +265,9 @@ export function boundsOf(coords: LonLat[]): LngLatBounds {
     [maxLon, maxLat],
   ];
 }
+
+export function boundsIntersect(a: LngLatBounds, b: LngLatBounds): boolean {
+  const [[aMinLon, aMinLat], [aMaxLon, aMaxLat]] = a;
+  const [[bMinLon, bMinLat], [bMaxLon, bMaxLat]] = b;
+  return aMinLon <= bMaxLon && aMaxLon >= bMinLon && aMinLat <= bMaxLat && aMaxLat >= bMinLat;
+}

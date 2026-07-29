@@ -33,3 +33,15 @@ export function routeMatchesFilters(route: Route, filters: FilterState): boolean
 export function toggleValue<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
+
+export type SortMode = "recommended" | "recent";
+
+export function sortRoutes(routes: Route[], mode: SortMode): Route[] {
+  const sorted = [...routes];
+  if (mode === "recommended") {
+    sorted.sort((a, b) => b.recommendationCount - a.recommendationCount);
+  } else {
+    sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+  return sorted;
+}

@@ -4,9 +4,13 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Sidebar from "./Sidebar";
 import { useViewportHeight } from "@/hooks/useViewportHeight";
-import { defaultFilterState, routeMatchesFilters } from "@/lib/filters";
-import type { FilterState } from "@/lib/filters";
+import { defaultFilterState, routeMatchesFilters, sortRoutes } from "@/lib/filters";
+import type { FilterState, SortMode } from "@/lib/filters";
+import { boundsIntersect } from "@/lib/geo";
+import type { LngLatBounds } from "@/lib/geo";
 import type { Route } from "@/types/route";
+
+const SIDEBAR_ROUTE_LIMIT = 5;
 
 // Leaflet touches `window` at module load time, so it must never run
 // during SSR — load it client-only.
@@ -32,6 +36,8 @@ export default function AppShell({
   const [filters, setFilters] = useState<FilterState>(() => defaultFilterState(routes));
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [viewportBounds, setViewportBounds] = useState<LngLatBounds | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("recommended");
 
   const bounds = useMemo(() => {
     const distances = routes.map((r) => r.distanceKm);
@@ -47,6 +53,16 @@ export default function AppShell({
     [routes, filters]
   );
 
+  const visibleRoutes = useMemo(() => {
+    if (!viewportBounds) return matchedRoutes;
+    return matchedRoutes.filter((r) => boundsIntersect(r.bounds, viewportBounds));
+  }, [matchedRoutes, viewportBounds]);
+
+  const sidebarRoutes = useMemo(
+    () => sortRoutes(visibleRoutes, sortMode).slice(0, SIDEBAR_ROUTE_LIMIT),
+    [visibleRoutes, sortMode]
+  );
+
   return (
     <div
       className="relative w-full overflow-hidden bg-forest"
@@ -55,7 +71,10 @@ export default function AppShell({
       <Sidebar
         userEmail={userEmail}
         totalCount={routes.length}
-        matchedRoutes={matchedRoutes}
+        visibleCount={visibleRoutes.length}
+        displayedRoutes={sidebarRoutes}
+        sortMode={sortMode}
+        onSortModeChange={setSortMode}
         filters={filters}
         onFiltersChange={setFilters}
         onReset={() => setFilters(defaultFilterState(routes))}
@@ -80,6 +99,7 @@ export default function AppShell({
             matchedRoutes={matchedRoutes}
             selectedRouteId={selectedRouteId}
             onSelectRoute={setSelectedRouteId}
+            onVisibleBoundsChange={setViewportBounds}
           />
         </div>
       </div>

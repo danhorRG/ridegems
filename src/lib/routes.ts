@@ -14,6 +14,8 @@ interface RouteRow {
   coordinates: [number, number][];
   profile: Route["profile"];
   bounds: Route["bounds"];
+  recommendation_count: number;
+  created_at: string;
 }
 
 function rowToRoute(row: RouteRow): Route {
@@ -30,11 +32,13 @@ function rowToRoute(row: RouteRow): Route {
     profile: row.profile,
     coordinates: row.coordinates,
     bounds: row.bounds,
+    recommendationCount: row.recommendation_count,
+    createdAt: row.created_at,
   };
 }
 
 const ROUTE_COLUMNS =
-  "slug,name,difficulty,surface,distance_km,elevation_gain_m,elevation_loss_m,min_elevation_m,max_elevation_m,coordinates,profile,bounds";
+  "slug,name,difficulty,surface,distance_km,elevation_gain_m,elevation_loss_m,min_elevation_m,max_elevation_m,coordinates,profile,bounds,recommendation_count,created_at";
 
 export async function getRoutes(): Promise<Route[]> {
   const { data, error } = await supabase
@@ -55,7 +59,6 @@ interface RouteDetailRow extends RouteRow {
   why_recommended: string | null;
   highlights: string[];
   track_points: RouteDetail["track"];
-  recommendation_count: number;
   created_by: string | null;
   route_photos: { url: string; caption: string | null }[];
   route_pois: {
@@ -69,7 +72,7 @@ interface RouteDetailRow extends RouteRow {
 }
 
 const ROUTE_DETAIL_COLUMNS =
-  `${ROUTE_COLUMNS}, description, why_recommended, highlights, track_points, recommendation_count, created_by, ` +
+  `${ROUTE_COLUMNS}, description, why_recommended, highlights, track_points, created_by, ` +
   "route_photos(url,caption), route_pois(name,description,category,lat,lon), " +
   "route_comments(author_name,body,created_at)";
 
@@ -95,7 +98,6 @@ export async function getRouteBySlug(slug: string): Promise<RouteDetail | null> 
     whyRecommended: row.why_recommended ?? "",
     highlights: row.highlights,
     track: row.track_points,
-    recommendationCount: row.recommendation_count,
     createdBy: row.created_by,
     photos: row.route_photos,
     pois: row.route_pois.map((poi) => ({

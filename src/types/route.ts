@@ -18,6 +18,8 @@ export interface Route {
   /** Simplified [lon, lat] line used for map rendering. */
   coordinates: [number, number][];
   bounds: LngLatBounds;
+  recommendationCount: number;
+  createdAt: string;
 }
 
 export interface RoutePhoto {
@@ -46,7 +48,6 @@ export interface RouteDetail extends Route {
   track: TrackPoint[];
   photos: RoutePhoto[];
   pois: RoutePoi[];
-  recommendationCount: number;
   comments: RouteComment[];
   createdBy: string | null;
 }

@@ -2,10 +2,19 @@
 
 import { Fragment, useEffect, useRef } from "react";
 import Link from "next/link";
-import { MapContainer, TileLayer, Polyline, Popup, ZoomControl, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Polyline,
+  Popup,
+  ZoomControl,
+  useMap,
+  useMapEvents,
+} from "react-leaflet";
 import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Route } from "@/types/route";
+import type { LngLatBounds } from "@/lib/geo";
 
 const DIFFICULTY_COLORS: Record<string, string> = {
   easy: "#6B8F71",
@@ -68,6 +77,33 @@ function FlyToSelected({
   return null;
 }
 
+/** Reports the map's current visible bounds on mount and after every pan/zoom. */
+function ReportVisibleBounds({
+  onBoundsChange,
+}: {
+  onBoundsChange: (bounds: LngLatBounds) => void;
+}) {
+  const map = useMapEvents({
+    moveend: () => {
+      const b = map.getBounds();
+      onBoundsChange([
+        [b.getWest(), b.getSouth()],
+        [b.getEast(), b.getNorth()],
+      ]);
+    },
+  });
+
+  useEffect(() => {
+    const b = map.getBounds();
+    onBoundsChange([
+      [b.getWest(), b.getSouth()],
+      [b.getEast(), b.getNorth()],
+    ]);
+  }, [map, onBoundsChange]);
+
+  return null;
+}
+
 /** Keeps Leaflet's internal size in sync with the container's real size. */
 function InvalidateSizeOnResize() {
   const map = useMap();
@@ -87,6 +123,7 @@ interface MapViewProps {
   matchedRoutes: Route[];
   selectedRouteId: string | null;
   onSelectRoute: (id: string) => void;
+  onVisibleBoundsChange: (bounds: LngLatBounds) => void;
 }
 
 export default function MapView({
@@ -94,6 +131,7 @@ export default function MapView({
   matchedRoutes,
   selectedRouteId,
   onSelectRoute,
+  onVisibleBoundsChange,
 }: MapViewProps) {
   const lastMapOriginatedId = useRef<string | null>(null);
   const apiKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
@@ -135,6 +173,7 @@ export default function MapView({
         lastMapOriginatedIdRef={lastMapOriginatedId}
       />
       <InvalidateSizeOnResize />
+      <ReportVisibleBounds onBoundsChange={onVisibleBoundsChange} />
 
       {routes.map((route) => {
         if (!matchedIds.has(route.id)) return null;

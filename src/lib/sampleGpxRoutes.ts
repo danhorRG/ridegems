@@ -196,6 +196,8 @@ export function getSampleRoutesFromGpx(): SampleRoute[] {
         highlights,
         track: buildTrackPoints(parsed.points),
         recommendationCount,
+        // Not used for the insert (the DB column defaults to now()) — present only to satisfy the Route type.
+        createdAt: new Date().toISOString(),
         comments: toComments(comments),
       };
     }

@@ -4,8 +4,13 @@ import Link from "next/link";
 import FilterPanel from "./FilterPanel";
 import RouteCard from "./RouteCard";
 import { signOutAction } from "@/app/login/actions";
-import type { FilterState } from "@/lib/filters";
+import type { FilterState, SortMode } from "@/lib/filters";
 import type { Route } from "@/types/route";
+
+const SORT_LABELS: Record<SortMode, string> = {
+  recommended: "Most recommended",
+  recent: "Most recently added",
+};
 
 function AuthStatus({ userEmail, className = "" }: { userEmail: string | null; className?: string }) {
   if (userEmail) {
@@ -35,7 +40,10 @@ function AuthStatus({ userEmail, className = "" }: { userEmail: string | null; c
 interface SidebarProps {
   userEmail: string | null;
   totalCount: number;
-  matchedRoutes: Route[];
+  visibleCount: number;
+  displayedRoutes: Route[];
+  sortMode: SortMode;
+  onSortModeChange: (mode: SortMode) => void;
   filters: FilterState;
   onFiltersChange: (next: FilterState) => void;
   onReset: () => void;
@@ -49,7 +57,10 @@ interface SidebarProps {
 export default function Sidebar({
   userEmail,
   totalCount,
-  matchedRoutes,
+  visibleCount,
+  displayedRoutes,
+  sortMode,
+  onSortModeChange,
   filters,
   onFiltersChange,
   onReset,
@@ -86,7 +97,7 @@ export default function Sidebar({
           </span>
           <span className="flex items-center gap-2">
             <span className="font-stats text-xs text-forest/60">
-              {matchedRoutes.length}/{totalCount} routes
+              {displayedRoutes.length}/{totalCount} routes
             </span>
             <svg
               viewBox="0 0 20 20"
@@ -112,7 +123,7 @@ export default function Sidebar({
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <span className="font-stats text-xs text-forest/60">
-              {matchedRoutes.length} of {totalCount} routes shown
+              {displayedRoutes.length} of {visibleCount} routes in view
             </span>
             <AuthStatus userEmail={userEmail} />
           </div>
@@ -140,13 +151,33 @@ export default function Sidebar({
           <h2 className="mb-2 mt-6 font-heading text-sm font-semibold uppercase tracking-wider text-forest/70">
             Routes
           </h2>
+          <div className="mb-3 flex gap-2">
+            {(Object.keys(SORT_LABELS) as SortMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={sortMode === mode}
+                onClick={() => onSortModeChange(mode)}
+                className={`min-h-9 flex-1 rounded-full border px-2 text-[0.7rem] font-semibold uppercase tracking-wide transition-colors ${
+                  sortMode === mode
+                    ? "border-amber bg-amber text-forest"
+                    : "border-forest/20 bg-transparent text-forest/70 hover:border-forest/40"
+                }`}
+              >
+                {SORT_LABELS[mode]}
+              </button>
+            ))}
+          </div>
+          <p className="mb-2 text-[0.7rem] text-forest/50">
+            Showing routes visible on the map &mdash; pan or zoom to see more.
+          </p>
           <div className="flex flex-col gap-2 pb-2">
-            {matchedRoutes.length === 0 && (
+            {displayedRoutes.length === 0 && (
               <p className="rounded-lg border border-dashed border-forest/20 px-3 py-4 text-center text-sm text-forest/50">
-                No routes match these filters.
+                No routes in view. Try zooming out or adjusting your filters.
               </p>
             )}
-            {matchedRoutes.map((route) => (
+            {displayedRoutes.map((route) => (
               <RouteCard
                 key={route.id}
                 route={route}
