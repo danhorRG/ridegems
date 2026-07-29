@@ -8,6 +8,12 @@ export interface AuthFormState {
   message?: string;
 }
 
+/** Only ever redirect to a same-site relative path, never an external URL. */
+function safeNextPath(formData: FormData): string {
+  const next = String(formData.get("next") ?? "");
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+}
+
 export async function signInAction(
   _prevState: AuthFormState,
   formData: FormData
@@ -25,7 +31,7 @@ export async function signInAction(
     return { status: "error", message: error.message };
   }
 
-  redirect("/");
+  redirect(safeNextPath(formData));
 }
 
 export async function signUpAction(
@@ -52,7 +58,7 @@ export async function signUpAction(
   // returns a live session -- log straight in. If it's on, there's no
   // session yet until the user clicks the confirmation link.
   if (data.session) {
-    redirect("/");
+    redirect(safeNextPath(formData));
   }
   return { status: "check-email" };
 }

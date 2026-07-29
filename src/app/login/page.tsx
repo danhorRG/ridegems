@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { Suspense, useActionState, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { signInAction, signUpAction, type AuthFormState } from "./actions";
 
 const initialState: AuthFormState = { status: "idle" };
@@ -9,7 +10,10 @@ const initialState: AuthFormState = { status: "idle" };
 const inputClass =
   "w-full rounded-lg border border-parchment/20 bg-forest-soft px-3 py-2 text-sm text-parchment placeholder:text-parchment/40 focus:border-amber focus:outline-none";
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? "/";
+
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [signInState, signInFormAction, signInPending] = useActionState(signInAction, initialState);
   const [signUpState, signUpFormAction, signUpPending] = useActionState(signUpAction, initialState);
@@ -65,6 +69,7 @@ export default function LoginPage() {
 
         {mode === "signin" ? (
           <form key="signin" action={signInFormAction} className="mt-6 flex flex-col gap-4">
+            <input type="hidden" name="next" value={next} />
             <label className="flex flex-col gap-1.5">
               <span className="font-heading text-xs font-semibold uppercase tracking-wider text-parchment/70">
                 Email
@@ -87,6 +92,7 @@ export default function LoginPage() {
           </form>
         ) : (
           <form key="signup" action={signUpFormAction} className="mt-6 flex flex-col gap-4">
+            <input type="hidden" name="next" value={next} />
             <label className="flex flex-col gap-1.5">
               <span className="font-heading text-xs font-semibold uppercase tracking-wider text-parchment/70">
                 Email
@@ -110,5 +116,13 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="h-full bg-forest" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

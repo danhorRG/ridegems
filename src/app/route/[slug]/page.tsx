@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import CommentForm from "@/components/CommentForm";
 import PhotoGallery from "@/components/PhotoGallery";
 import RecommendButton from "@/components/RecommendButton";
 import RouteDetailInteractive from "@/components/RouteDetailInteractive";
 import { getRouteBySlug } from "@/lib/routes";
+import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import type { PoiCategory } from "@/types/route";
 
 function formatCommentDate(iso: string): string {
@@ -40,8 +42,26 @@ export default async function RouteDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const route = await getRouteBySlug(slug);
+  const [route, supabase] = await Promise.all([getRouteBySlug(slug), createSupabaseServerClient()]);
   if (!route) notFound();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let alreadyRecommended = false;
+  if (user) {
+    const { data: routeRow } = await supabase.from("routes").select("id").eq("slug", slug).maybeSingle();
+    if (routeRow) {
+      const { data: rec } = await supabase
+        .from("route_recommendations")
+        .select("id")
+        .eq("route_id", routeRow.id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      alreadyRecommended = !!rec;
+    }
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-forest">
@@ -65,7 +85,12 @@ export default async function RouteDetailPage({
         </div>
 
         <div className="mt-3 flex items-center gap-3">
-          <RecommendButton initialCount={route.recommendationCount} />
+          <RecommendButton
+            slug={route.id}
+            initialCount={route.recommendationCount}
+            initialRecommended={alreadyRecommended}
+            isSignedIn={!!user}
+          />
           <a
             href={`/route/${route.id}/gpx`}
             download
@@ -135,9 +160,10 @@ export default async function RouteDetailPage({
         </div>
 
         <div className="mt-8">
-          <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-parchment/70">
+          <h2 className="mb-3 font-heading text-sm font-semibold uppercase tracking-wider text-parchment/70">
             Trip reports
           </h2>
+          <CommentForm slug={route.id} isSignedIn={!!user} />
           {route.comments.length === 0 ? (
             <p className="mt-2 text-sm text-parchment/50">No trip reports yet.</p>
           ) : (
