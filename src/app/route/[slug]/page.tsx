@@ -84,6 +84,15 @@ export default async function RouteDetailPage({
           </span>
         </div>
 
+        {user && route.createdBy === user.id && (
+          <Link
+            href={`/route/${route.id}/edit`}
+            className="mt-1 inline-block font-stats text-xs uppercase tracking-wide text-amber hover:underline"
+          >
+            Edit this route
+          </Link>
+        )}
+
         <div className="mt-3 flex items-center gap-3">
           <RecommendButton
             slug={route.id}

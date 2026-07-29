@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { supabase } from "./supabase";
+import { createSupabaseServerClient } from "./supabaseServer";
 import type { Difficulty, Surface } from "@/types/route";
 import type { ElevationProfilePoint, LngLatBounds, TrackPoint } from "./geo";
 
@@ -34,24 +34,35 @@ export interface SubmitRouteInput {
 export type SubmitRouteResult = { ok: true; name: string } | { ok: false; message: string };
 
 /**
- * The GPX file itself is parsed client-side (see submit/page.tsx) — this
- * function only ever receives the small computed result (stats, simplified
- * line, elevation profile), which stays well under Vercel's request body
- * limit regardless of how large the original GPX file was. Photos are
- * likewise uploaded directly from the browser to Supabase Storage; only
- * their resulting URLs arrive here.
+ * The GPX file itself is parsed client-side (see submit/SubmitForm.tsx) —
+ * this function only ever receives the small computed result (stats,
+ * simplified line, elevation profile), which stays well under Vercel's
+ * request body limit regardless of how large the original GPX file was.
+ * Photos are likewise uploaded directly from the browser to Supabase
+ * Storage; only their resulting URLs arrive here.
  *
- * Inserted with status='pending' via the public (anon-key) client, which is
+ * Requires a signed-in account (submission used to be anonymous; gated
+ * behind login so every route has an attributed owner who can edit it
+ * later, and so the RLS insert policy can require auth.uid() is not null).
+ *
+ * Inserted with status='pending' via the session-aware server client —
  * safe because the RLS insert policy on `routes` only ever permits
  * status='pending' rows — nothing a submitter sends can go live without
  * being manually flipped to 'published' in the Supabase table editor.
  *
  * The row's id is generated here rather than read back from the insert
- * response: the anon key's SELECT policy only allows `published` rows, so
- * `.insert().select()` on a pending row fails RLS on the read-back half of
- * the round trip (a well-known Postgres RLS gotcha for INSERT...RETURNING).
+ * response to sidestep a Postgres RLS gotcha with INSERT...RETURNING
+ * (see ridegems_elevation_data / earlier commits for the full story).
  */
 export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, message: "Sign in required to submit a route." };
+  }
+
   const name = input.name.trim();
   const description = input.description.trim();
   const whyRecommended = input.whyRecommended.trim();
@@ -100,6 +111,7 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
       track_points: input.track,
       recommendation_count: 0,
       status: "pending",
+      created_by: user.id,
     });
 
     if (!error) {

@@ -48,4 +48,5 @@ export interface RouteDetail extends Route {
   pois: RoutePoi[];
   recommendationCount: number;
   comments: RouteComment[];
+  createdBy: string | null;
 }

@@ -56,6 +56,7 @@ interface RouteDetailRow extends RouteRow {
   highlights: string[];
   track_points: RouteDetail["track"];
   recommendation_count: number;
+  created_by: string | null;
   route_photos: { url: string; caption: string | null }[];
   route_pois: {
     name: string;
@@ -68,7 +69,7 @@ interface RouteDetailRow extends RouteRow {
 }
 
 const ROUTE_DETAIL_COLUMNS =
-  `${ROUTE_COLUMNS}, description, why_recommended, highlights, track_points, recommendation_count, ` +
+  `${ROUTE_COLUMNS}, description, why_recommended, highlights, track_points, recommendation_count, created_by, ` +
   "route_photos(url,caption), route_pois(name,description,category,lat,lon), " +
   "route_comments(author_name,body,created_at)";
 
@@ -95,6 +96,7 @@ export async function getRouteBySlug(slug: string): Promise<RouteDetail | null> 
     highlights: row.highlights,
     track: row.track_points,
     recommendationCount: row.recommendation_count,
+    createdBy: row.created_by,
     photos: row.route_photos,
     pois: row.route_pois.map((poi) => ({
       ...poi,
