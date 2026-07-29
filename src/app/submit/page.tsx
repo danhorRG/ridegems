@@ -1,15 +1,30 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { submitRouteAction, type SubmitFormState } from "./actions";
+import { submitRoutePayload, type SubmitFormState } from "./actions";
+import { parseGpx } from "@/lib/gpx";
+import { buildTrackPoints, computeTrackStats, simplifyLine, boundsOf } from "@/lib/geo";
+import { supabase } from "@/lib/supabase";
 
 const initialState: SubmitFormState = { status: "idle" };
 
-// Vercel hard-caps request bodies at 4.5MB and our Server Action config
-// allows 4MB; check client-side against a slightly lower threshold so
-// there's room for the other form fields and multipart overhead.
-const MAX_TOTAL_BYTES = 3.8 * 1024 * 1024;
+// Sanity guard only — GPX parsing happens in the browser, so there's no
+// server body-size limit to worry about. This just stops someone from
+// accidentally hanging their own browser on a mislabeled huge file.
+const MAX_GPX_BYTES = 30 * 1024 * 1024;
+
+// Photos upload straight to Supabase Storage, so there's no request-size
+// limit forcing this — it's here to keep storage usage and page load times
+// reasonable, since we don't downscale what's uploaded.
+const MAX_PHOTO_BYTES = 1 * 1024 * 1024;
+
+const PHOTO_CONTENT_TYPES: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+};
 
 const inputClass =
   "w-full rounded-lg border border-parchment/20 bg-forest-soft px-3 py-2 text-sm text-parchment placeholder:text-parchment/40 focus:border-amber focus:outline-none";
@@ -26,31 +41,106 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function SubmitPage() {
-  const [state, formAction, pending] = useActionState(submitRouteAction, initialState);
+  const [result, setResult] = useState<SubmitFormState>(initialState);
+  const [pending, startTransition] = useTransition();
   const [whyLength, setWhyLength] = useState(0);
-  const [clientError, setClientError] = useState<string | null>(null);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     const form = e.currentTarget;
-    const gpxInput = form.elements.namedItem("gpx") as HTMLInputElement;
-    const photosInput = form.elements.namedItem("photos") as HTMLInputElement;
+    const formData = new FormData(form);
 
-    const gpxBytes = gpxInput.files?.[0]?.size ?? 0;
-    const photoBytes = Array.from(photosInput.files ?? []).reduce((sum, f) => sum + f.size, 0);
-    const totalBytes = gpxBytes + photoBytes;
-
-    if (totalBytes > MAX_TOTAL_BYTES) {
-      e.preventDefault();
-      const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
-      setClientError(
-        `GPX file and photos add up to ${totalMB}MB, which is over the 4MB combined limit. Remove or resize a photo and try again.`
-      );
+    const gpxFile = formData.get("gpx");
+    if (!(gpxFile instanceof File) || gpxFile.size === 0) {
+      setResult({ status: "error", message: "Please choose a GPX file." });
       return;
     }
-    setClientError(null);
+    if (gpxFile.size > MAX_GPX_BYTES) {
+      setResult({ status: "error", message: "That GPX file looks unusually large — double check it's a track export, not something else." });
+      return;
+    }
+    const photoFiles = formData
+      .getAll("photos")
+      .filter((f): f is File => f instanceof File && f.size > 0);
+
+    const oversizedPhotos = photoFiles.filter((f) => f.size > MAX_PHOTO_BYTES);
+    if (oversizedPhotos.length > 0) {
+      const names = oversizedPhotos.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`).join(", ");
+      setResult({
+        status: "error",
+        message: `Photos must be ${MAX_PHOTO_BYTES / 1024 / 1024}MB or smaller — resize these and try again: ${names}`,
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      const gpxText = await gpxFile.text();
+
+      let parsed;
+      try {
+        parsed = parseGpx(gpxText);
+      } catch {
+        setResult({
+          status: "error",
+          message: "Could not read that GPX file — make sure it's a valid track export.",
+        });
+        return;
+      }
+      if (parsed.points.length < 2) {
+        setResult({
+          status: "error",
+          message: "That GPX file doesn't have enough track points to plot a route.",
+        });
+        return;
+      }
+
+      const stats = computeTrackStats(parsed.points);
+      const fullLine: [number, number][] = parsed.points.map((p) => [p.lon, p.lat]);
+      const coordinates = simplifyLine(fullLine, 6);
+      const track = buildTrackPoints(parsed.points);
+      const bounds = boundsOf(coordinates);
+
+      // Uploaded directly to Supabase Storage from the browser — never
+      // passes through our server, so it isn't subject to Vercel's request
+      // body limit either.
+      const photoUrls: string[] = [];
+      for (const file of photoFiles) {
+        const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
+        const contentType = PHOTO_CONTENT_TYPES[ext];
+        if (!contentType) continue;
+
+        const path = `submissions/${crypto.randomUUID()}${ext}`;
+        const { error } = await supabase.storage
+          .from("route-photos")
+          .upload(path, file, { contentType });
+        if (error) continue;
+
+        const { data } = supabase.storage.from("route-photos").getPublicUrl(path);
+        photoUrls.push(data.publicUrl);
+      }
+
+      const response = await submitRoutePayload({
+        name: String(formData.get("name") ?? ""),
+        description: String(formData.get("description") ?? ""),
+        difficulty: String(formData.get("difficulty") ?? ""),
+        surface: String(formData.get("surface") ?? ""),
+        whyRecommended: String(formData.get("whyRecommended") ?? ""),
+        distanceKm: stats.distanceKm,
+        elevationGainM: stats.elevationGainM,
+        elevationLossM: stats.elevationLossM,
+        minElevationM: stats.minElevationM,
+        maxElevationM: stats.maxElevationM,
+        coordinates,
+        profile: stats.profile,
+        bounds,
+        track,
+        photoUrls,
+      });
+      setResult(response);
+    });
   }
 
-  if (state.status === "success") {
+  if (result.status === "success") {
     return (
       <div className="h-full overflow-y-auto bg-forest">
         <div className="mx-auto max-w-2xl px-5 py-16 text-center">
@@ -58,7 +148,7 @@ export default function SubmitPage() {
             Thanks!
           </h1>
           <p className="mt-3 text-sm text-parchment/80">
-            <span className="font-semibold text-parchment">{state.routeName}</span> has been
+            <span className="font-semibold text-parchment">{result.routeName}</span> has been
             submitted and is awaiting review before it appears on the map.
           </p>
           <Link
@@ -89,18 +179,14 @@ export default function SubmitPage() {
           Share a route you&apos;ve actually ridden — help us build an ultimate collection so that
           wherever you travel, there&apos;s a local&apos;s route waiting for you.
         </p>
-        <p className="mt-1 text-xs text-parchment/40">
-          GPX + photos: 4MB max combined. Phone photos are usually the culprit — resize or drop a
-          couple if you hit the limit.
-        </p>
 
-        {(clientError || (state.status === "error" && state.message)) && (
+        {result.status === "error" && result.message && (
           <div className="mt-6 rounded-lg border border-rust/50 bg-rust/10 px-4 py-3 text-sm text-parchment">
-            {clientError ?? state.message}
+            {result.message}
           </div>
         )}
 
-        <form action={formAction} onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5 pb-12">
+        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5 pb-12">
           <Field label="Route name">
             <input name="name" type="text" required maxLength={120} className={inputClass} />
           </Field>
@@ -143,11 +229,11 @@ export default function SubmitPage() {
             />
           </Field>
 
-          <Field label="Description (optional)">
-            <textarea name="description" rows={5} maxLength={2000} className={inputClass} />
+          <Field label="Description">
+            <textarea name="description" required rows={5} maxLength={2000} className={inputClass} />
           </Field>
 
-          <Field label="Photos (optional)">
+          <Field label="Photos (optional, max 1MB each)">
             <input name="photos" type="file" accept="image/*" multiple className={inputClass} />
           </Field>
 

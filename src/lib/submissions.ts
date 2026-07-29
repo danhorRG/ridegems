@@ -1,17 +1,10 @@
 import { randomUUID } from "crypto";
 import { supabase } from "./supabase";
-import { parseGpx } from "./gpx";
-import { buildTrackPoints, computeTrackStats, simplifyLine, boundsOf } from "./geo";
 import type { Difficulty, Surface } from "@/types/route";
+import type { ElevationProfilePoint, LngLatBounds, TrackPoint } from "./geo";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "moderate", "hard"];
 const SURFACES: Surface[] = ["paved", "gravel", "mixed"];
-const PHOTO_CONTENT_TYPES: Record<string, string> = {
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp",
-};
 
 function slugify(name: string): string {
   return name
@@ -26,13 +19,28 @@ export interface SubmitRouteInput {
   difficulty: string;
   surface: string;
   whyRecommended: string;
-  gpxText: string;
-  photos: File[];
+  distanceKm: number;
+  elevationGainM: number;
+  elevationLossM: number;
+  minElevationM: number;
+  maxElevationM: number;
+  coordinates: [number, number][];
+  profile: ElevationProfilePoint[];
+  bounds: LngLatBounds;
+  track: TrackPoint[];
+  photoUrls: string[];
 }
 
 export type SubmitRouteResult = { ok: true; name: string } | { ok: false; message: string };
 
 /**
+ * The GPX file itself is parsed client-side (see submit/page.tsx) — this
+ * function only ever receives the small computed result (stats, simplified
+ * line, elevation profile), which stays well under Vercel's request body
+ * limit regardless of how large the original GPX file was. Photos are
+ * likewise uploaded directly from the browser to Supabase Storage; only
+ * their resulting URLs arrive here.
+ *
  * Inserted with status='pending' via the public (anon-key) client, which is
  * safe because the RLS insert policy on `routes` only ever permits
  * status='pending' rows — nothing a submitter sends can go live without
@@ -49,6 +57,7 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
   const whyRecommended = input.whyRecommended.trim();
 
   if (!name) return { ok: false, message: "Route name is required." };
+  if (!description) return { ok: false, message: "Description is required." };
   if (!whyRecommended) {
     return { ok: false, message: 'The "why does this route deserve a spot?" field is required.' };
   }
@@ -61,30 +70,13 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
   if (!SURFACES.includes(input.surface as Surface)) {
     return { ok: false, message: "Choose a valid surface." };
   }
-  if (!input.gpxText.trim()) {
-    return { ok: false, message: "A GPX file is required." };
-  }
-
-  let parsed;
-  try {
-    parsed = parseGpx(input.gpxText);
-  } catch {
-    return { ok: false, message: "Could not read that GPX file — make sure it's a valid track export." };
-  }
-  if (parsed.points.length < 2) {
+  if (!Array.isArray(input.coordinates) || input.coordinates.length < 2 || input.distanceKm <= 0) {
     return { ok: false, message: "That GPX file doesn't have enough track points to plot a route." };
   }
-
-  const stats = computeTrackStats(parsed.points);
-  const fullLine: [number, number][] = parsed.points.map((p) => [p.lon, p.lat]);
-  const coordinates = simplifyLine(fullLine, 6);
-  const track = buildTrackPoints(parsed.points);
-  const bounds = boundsOf(coordinates);
 
   const baseSlug = slugify(name) || "route";
   const id = randomUUID();
   let insertedId: string | null = null;
-  let finalSlug = baseSlug;
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const slug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
@@ -94,25 +86,24 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
       name,
       difficulty: input.difficulty,
       surface: input.surface,
-      distance_km: Math.round(stats.distanceKm * 10) / 10,
-      elevation_gain_m: stats.elevationGainM,
-      elevation_loss_m: stats.elevationLossM,
-      min_elevation_m: stats.minElevationM,
-      max_elevation_m: stats.maxElevationM,
-      coordinates,
-      profile: stats.profile,
-      bounds,
+      distance_km: Math.round(input.distanceKm * 10) / 10,
+      elevation_gain_m: input.elevationGainM,
+      elevation_loss_m: input.elevationLossM,
+      min_elevation_m: input.minElevationM,
+      max_elevation_m: input.maxElevationM,
+      coordinates: input.coordinates,
+      profile: input.profile,
+      bounds: input.bounds,
       description: description || null,
       why_recommended: whyRecommended,
       highlights: [],
-      track_points: track,
+      track_points: input.track,
       recommendation_count: 0,
       status: "pending",
     });
 
     if (!error) {
       insertedId = id;
-      finalSlug = slug;
       break;
     }
     if (error.code !== "23505") {
@@ -125,27 +116,14 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
     return { ok: false, message: "Could not generate a unique route URL. Try a slightly different name." };
   }
 
-  for (let i = 0; i < input.photos.length; i++) {
-    const file = input.photos[i];
-    if (file.size === 0) continue;
-    const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
-    const contentType = PHOTO_CONTENT_TYPES[ext];
-    if (!contentType) continue;
-
-    const storagePath = `${finalSlug}/${Date.now()}-${i}${ext}`;
-    const bytes = new Uint8Array(await file.arrayBuffer());
-
-    const { error: uploadError } = await supabase.storage
-      .from("route-photos")
-      .upload(storagePath, bytes, { contentType, upsert: false });
-    if (uploadError) continue;
-
-    const { data: publicUrl } = supabase.storage.from("route-photos").getPublicUrl(storagePath);
-    await supabase.from("route_photos").insert({
-      route_id: insertedId,
-      url: publicUrl.publicUrl,
-      sort_order: i,
-    });
+  if (input.photoUrls.length > 0) {
+    await supabase.from("route_photos").insert(
+      input.photoUrls.map((url, i) => ({
+        route_id: insertedId,
+        url,
+        sort_order: i,
+      }))
+    );
   }
 
   return { ok: true, name };
