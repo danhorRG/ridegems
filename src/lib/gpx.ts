@@ -44,3 +44,42 @@ export function parseGpx(xml: string): ParsedGpx {
 
   return { name, points };
 }
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
+ * Regenerates a GPX file from a route's stored track points (already at
+ * terrain-corrected elevation, see src/lib/elevation.ts) rather than
+ * re-serving the originally uploaded file, so every route -- including
+ * ones seeded before an export feature existed -- can be exported the
+ * same way, with the same trustworthy elevation data shown on the site.
+ */
+export function buildGpxXml(
+  name: string,
+  track: { lat: number; lon: number; elevationM: number }[]
+): string {
+  const points = track
+    .map(
+      (p) =>
+        `      <trkpt lat="${p.lat}" lon="${p.lon}"><ele>${p.elevationM}</ele></trkpt>`
+    )
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="RideGems" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${escapeXml(name)}</name>
+    <trkseg>
+${points}
+    </trkseg>
+  </trk>
+</gpx>
+`;
+}

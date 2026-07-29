@@ -64,8 +64,22 @@ export default async function RouteDetailPage({
           </span>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 flex items-center gap-3">
           <RecommendButton initialCount={route.recommendationCount} />
+          <a
+            href={`/route/${route.id}/gpx`}
+            download
+            className="flex items-center gap-1.5 rounded-full border border-parchment/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-parchment/80 transition-colors hover:border-amber hover:text-amber"
+          >
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.6}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M10 3v9m0 0l-3.5-3.5M10 12l3.5-3.5M4 14v1.5A1.5 1.5 0 005.5 17h9a1.5 1.5 0 001.5-1.5V14"
+              />
+            </svg>
+            Download GPX
+          </a>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
