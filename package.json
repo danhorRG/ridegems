@@ -11,6 +11,7 @@
     "recompute-elevation": "tsx --env-file=.env.local scripts/recompute-elevation.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",
     "fast-xml-parser": "^5.10.1",
     "leaflet": "^1.9.4",

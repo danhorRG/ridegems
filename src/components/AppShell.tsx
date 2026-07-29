@@ -21,7 +21,13 @@ const MapView = dynamic(() => import("./MapView"), {
   ),
 });
 
-export default function AppShell({ routes }: { routes: Route[] }) {
+export default function AppShell({
+  routes,
+  userEmail,
+}: {
+  routes: Route[];
+  userEmail: string | null;
+}) {
   const viewportHeight = useViewportHeight();
   const [filters, setFilters] = useState<FilterState>(() => defaultFilterState(routes));
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -47,6 +53,7 @@ export default function AppShell({ routes }: { routes: Route[] }) {
       style={{ height: viewportHeight ? `${viewportHeight}px` : "100dvh" }}
     >
       <Sidebar
+        userEmail={userEmail}
         totalCount={routes.length}
         matchedRoutes={matchedRoutes}
         filters={filters}

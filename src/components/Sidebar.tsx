@@ -3,10 +3,37 @@
 import Link from "next/link";
 import FilterPanel from "./FilterPanel";
 import RouteCard from "./RouteCard";
+import { signOutAction } from "@/app/login/actions";
 import type { FilterState } from "@/lib/filters";
 import type { Route } from "@/types/route";
 
+function AuthStatus({ userEmail, className = "" }: { userEmail: string | null; className?: string }) {
+  if (userEmail) {
+    return (
+      <div className={`flex items-center gap-2 font-stats text-xs text-forest/60 ${className}`}>
+        <span className="truncate">{userEmail}</span>
+        <button
+          type="button"
+          onClick={() => signOutAction()}
+          className="shrink-0 uppercase tracking-wide text-forest/50 underline-offset-2 hover:text-forest hover:underline"
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+  return (
+    <Link
+      href="/login"
+      className={`font-stats text-xs uppercase tracking-wide text-forest/60 hover:text-forest ${className}`}
+    >
+      Sign in
+    </Link>
+  );
+}
+
 interface SidebarProps {
+  userEmail: string | null;
   totalCount: number;
   matchedRoutes: Route[];
   filters: FilterState;
@@ -20,6 +47,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({
+  userEmail,
   totalCount,
   matchedRoutes,
   filters,
@@ -82,12 +110,19 @@ export default function Sidebar({
               + Submit
             </Link>
           </div>
-          <div className="mt-1 font-stats text-xs text-forest/60">
-            {matchedRoutes.length} of {totalCount} routes shown
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <span className="font-stats text-xs text-forest/60">
+              {matchedRoutes.length} of {totalCount} routes shown
+            </span>
+            <AuthStatus userEmail={userEmail} />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:pb-5">
+          <div className="mb-4 flex items-center justify-between gap-2 md:hidden">
+            <AuthStatus userEmail={userEmail} />
+          </div>
+
           <Link
             href="/submit"
             className="mb-4 block w-full rounded-lg border border-dashed border-forest/25 px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-forest/70 hover:border-amber hover:text-forest md:hidden"
