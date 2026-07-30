@@ -4,7 +4,7 @@ import type { Difficulty, Surface } from "@/types/route";
 import type { ElevationProfilePoint, LngLatBounds, TrackPoint } from "./geo";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "moderate", "hard"];
-const SURFACES: Surface[] = ["paved", "gravel", "mixed"];
+const SURFACES: Surface[] = ["paved", "gravel", "mtb"];
 
 function slugify(name: string): string {
   return name

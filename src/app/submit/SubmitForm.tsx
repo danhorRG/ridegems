@@ -235,7 +235,7 @@ export default function SubmitForm() {
                 </option>
                 <option value="paved">Paved</option>
                 <option value="gravel">Gravel</option>
-                <option value="mixed">Mixed</option>
+                <option value="mtb">MTB</option>
               </select>
             </Field>
           </div>

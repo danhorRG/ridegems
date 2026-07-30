@@ -8,7 +8,7 @@ export interface FilterState {
 }
 
 export const ALL_DIFFICULTIES: Difficulty[] = ["easy", "moderate", "hard"];
-export const ALL_SURFACES: Surface[] = ["paved", "gravel", "mixed"];
+export const ALL_SURFACES: Surface[] = ["paved", "gravel", "mtb"];
 
 export function defaultFilterState(routes: Route[]): FilterState {
   const distances = routes.map((r) => r.distanceKm);

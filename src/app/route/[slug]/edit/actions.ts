@@ -6,7 +6,7 @@ import type { Difficulty, PoiCategory, Surface } from "@/types/route";
 import { POI_CATEGORIES } from "@/lib/poi";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "moderate", "hard"];
-const SURFACES: Surface[] = ["paved", "gravel", "mixed"];
+const SURFACES: Surface[] = ["paved", "gravel", "mtb"];
 
 interface NewPoiInput {
   name: string;

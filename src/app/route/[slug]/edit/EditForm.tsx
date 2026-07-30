@@ -202,7 +202,7 @@ export default function EditForm({
               <select name="surface" required defaultValue={surface} className={inputClass}>
                 <option value="paved">Paved</option>
                 <option value="gravel">Gravel</option>
-                <option value="mixed">Mixed</option>
+                <option value="mtb">MTB</option>
               </select>
             </Field>
           </div>

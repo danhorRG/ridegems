@@ -7,6 +7,7 @@ export const POI_CATEGORIES: PoiCategory[] = [
   "water",
   "cultural",
   "bike_shop",
+  "climb",
   "hazard",
   "other",
 ];
@@ -18,6 +19,7 @@ export const POI_LABELS: Record<PoiCategory, string> = {
   water: "Water refill",
   cultural: "Cultural attraction",
   bike_shop: "Bike shop",
+  climb: "Climb",
   hazard: "Hazard",
   other: "Point of interest",
 };
@@ -29,6 +31,7 @@ export const POI_COLORS: Record<PoiCategory, string> = {
   water: "#6B8F71",
   cultural: "#8A6D3F",
   bike_shop: "#5B6B78",
+  climb: "#9C3B3B",
   hazard: "#C1542C",
   other: "#8A8575",
 };
@@ -48,6 +51,7 @@ export const POI_ICON_PATHS: Record<PoiCategory, string> = {
     '<path d="M3 16h14M4 16V9M7 16V9M10 16V9M13 16V9M16 16V9M2.5 9L10 4l7.5 5"/>',
   bike_shop:
     '<path d="M13.5 3.5a3.5 3.5 0 00-4.6 4.2L3 13.6V17h3.4l5.9-5.9a3.5 3.5 0 004.2-4.6l-2.6 2.6-2-2 2.6-2.6z"/>',
+  climb: '<path d="M3 15.5L9 9.5l2.5 2.5L17 5.5"/><path d="M12 5.5h5v5"/>',
   hazard:
     '<path d="M10 3.5L17.5 16h-15L10 3.5z"/>' +
     '<path d="M10 8.5v3.2"/>' +

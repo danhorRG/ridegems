@@ -13,7 +13,7 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
 const SURFACE_LABELS: Record<Surface, string> = {
   paved: "Paved",
   gravel: "Gravel",
-  mixed: "Mixed",
+  mtb: "MTB",
 };
 
 interface FilterPanelProps {

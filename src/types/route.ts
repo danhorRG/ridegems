@@ -1,7 +1,7 @@
 import type { ElevationProfilePoint, LngLatBounds, TrackPoint } from "@/lib/geo";
 
 export type Difficulty = "easy" | "moderate" | "hard";
-export type Surface = "paved" | "gravel" | "mixed";
+export type Surface = "paved" | "gravel" | "mtb";
 export type PoiCategory =
   | "viewpoint"
   | "water"
@@ -9,6 +9,7 @@ export type PoiCategory =
   | "food"
   | "cultural"
   | "bike_shop"
+  | "climb"
   | "hazard"
   | "other";
 
