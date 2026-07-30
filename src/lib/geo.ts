@@ -145,84 +145,49 @@ export function statsFromTrack(track: TrackPoint[]): ElevationStats {
   };
 }
 
-/**
- * Like the `profile` array in computeTrackStats, but keeps lat/lon per point
- * too, so a single index maps a distance/elevation to a map position. Used
- * to sync the route detail page's map hover with its elevation chart hover.
- */
-export function buildTrackPoints(points: RawTrackPoint[], maxPoints = 300): TrackPoint[] {
-  if (points.length === 0) return [];
-
-  const cumulativeDistanceM: number[] = [0];
-  for (let i = 1; i < points.length; i++) {
-    cumulativeDistanceM.push(
-      cumulativeDistanceM[i - 1] + haversineMeters(points[i - 1], points[i])
-    );
-  }
-
-  const step = Math.max(1, Math.floor(points.length / maxPoints));
-  const track: TrackPoint[] = [];
-  for (let i = 0; i < points.length; i += step) {
-    track.push({
-      lat: points[i].lat,
-      lon: points[i].lon,
-      distanceKm: cumulativeDistanceM[i] / 1000,
-      elevationM: Math.round(points[i].ele),
-    });
-  }
-  const last = points.length - 1;
-  if (track[track.length - 1]?.distanceKm !== cumulativeDistanceM[last] / 1000) {
-    track.push({
-      lat: points[last].lat,
-      lon: points[last].lon,
-      distanceKm: cumulativeDistanceM[last] / 1000,
-      elevationM: Math.round(points[last].ele),
-    });
-  }
-  return track;
-}
-
-type LonLat = [number, number];
+type XY = [number, number];
 
 /**
- * Douglas-Peucker simplification for [lon, lat] coordinates. Longitude is
- * scaled by cos(refLat) so perpendicular-distance comparisons approximate
- * real-world meters despite lon/lat having different physical scale.
+ * Projects lat/lon to a local planar XY (meters) around the point set's
+ * median latitude, so perpendicular-distance comparisons in Douglas-Peucker
+ * approximate real-world meters despite lon/lat having different physical
+ * scale at non-equatorial latitudes.
  */
-export function simplifyLine(coords: LonLat[], toleranceM = 6): LonLat[] {
-  if (coords.length <= 2) return coords;
-
-  const refLatRad = toRad(coords[Math.floor(coords.length / 2)][1]);
+function projectToXY(coords: { lat: number; lon: number }[]): XY[] {
+  const refLatRad = toRad(coords[Math.floor(coords.length / 2)].lat);
   const cosRefLat = Math.cos(refLatRad);
   const metersPerDegLat = (Math.PI / 180) * EARTH_RADIUS_M;
+  return coords.map(({ lat, lon }): XY => [lon * cosRefLat * metersPerDegLat, lat * metersPerDegLat]);
+}
 
-  const toXY = ([lon, lat]: LonLat): [number, number] => [
-    lon * cosRefLat * metersPerDegLat,
-    lat * metersPerDegLat,
-  ];
+function perpendicularDistance(point: XY, start: XY, end: XY): number {
+  const [x, y] = point;
+  const [x1, y1] = start;
+  const [x2, y2] = end;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(x - x1, y - y1);
+  const t = ((x - x1) * dx + (y - y1) * dy) / lenSq;
+  const tClamped = Math.max(0, Math.min(1, t));
+  const projX = x1 + tClamped * dx;
+  const projY = y1 + tClamped * dy;
+  return Math.hypot(x - projX, y - projY);
+}
 
-  const perpendicularDistance = (
-    point: [number, number],
-    start: [number, number],
-    end: [number, number]
-  ): number => {
-    const [x, y] = point;
-    const [x1, y1] = start;
-    const [x2, y2] = end;
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const lenSq = dx * dx + dy * dy;
-    if (lenSq === 0) return Math.hypot(x - x1, y - y1);
-    const t = ((x - x1) * dx + (y - y1) * dy) / lenSq;
-    const tClamped = Math.max(0, Math.min(1, t));
-    const projX = x1 + tClamped * dx;
-    const projY = y1 + tClamped * dy;
-    return Math.hypot(x - projX, y - projY);
-  };
+/**
+ * Douglas-Peucker simplification: returns which indices to keep from a
+ * sequence of points already projected to local XY meters. Keeps more
+ * points where the path curves and fewer where it's straight, unlike
+ * fixed-interval decimation which can cut corners off sharp turns.
+ */
+function douglasPeuckerKeep(xy: XY[], toleranceM: number): boolean[] {
+  const keep = new Array(xy.length).fill(false);
+  if (xy.length === 0) return keep;
+  keep[0] = true;
+  keep[xy.length - 1] = true;
 
-  const xy = coords.map(toXY);
-
-  function dp(startIdx: number, endIdx: number, keep: boolean[]) {
+  function dp(startIdx: number, endIdx: number) {
     let maxDist = 0;
     let maxIdx = -1;
     for (let i = startIdx + 1; i < endIdx; i++) {
@@ -234,16 +199,58 @@ export function simplifyLine(coords: LonLat[], toleranceM = 6): LonLat[] {
     }
     if (maxDist > toleranceM && maxIdx !== -1) {
       keep[maxIdx] = true;
-      dp(startIdx, maxIdx, keep);
-      dp(maxIdx, endIdx, keep);
+      dp(startIdx, maxIdx);
+      dp(maxIdx, endIdx);
     }
   }
 
-  const keep = new Array(coords.length).fill(false);
-  keep[0] = true;
-  keep[coords.length - 1] = true;
-  dp(0, coords.length - 1, keep);
+  if (xy.length > 2) dp(0, xy.length - 1);
+  return keep;
+}
 
+/**
+ * Like the `profile` array in computeTrackStats, but keeps lat/lon per point
+ * too, so a single index maps a distance/elevation to a map position. Used
+ * to sync the route detail page's map hover with its elevation chart hover,
+ * to render the on-page map polyline, and as the source for GPX export —
+ * so points are kept via geometry-aware simplification (not a fixed point
+ * cap) to preserve road-following fidelity on curves and switchbacks.
+ */
+export function buildTrackPoints(points: RawTrackPoint[], toleranceM = 3): TrackPoint[] {
+  if (points.length === 0) return [];
+
+  const cumulativeDistanceM: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    cumulativeDistanceM.push(
+      cumulativeDistanceM[i - 1] + haversineMeters(points[i - 1], points[i])
+    );
+  }
+
+  const keep = douglasPeuckerKeep(projectToXY(points), toleranceM);
+
+  const track: TrackPoint[] = [];
+  for (let i = 0; i < points.length; i++) {
+    if (!keep[i]) continue;
+    track.push({
+      lat: points[i].lat,
+      lon: points[i].lon,
+      distanceKm: cumulativeDistanceM[i] / 1000,
+      elevationM: Math.round(points[i].ele),
+    });
+  }
+  return track;
+}
+
+type LonLat = [number, number];
+
+/**
+ * Douglas-Peucker simplification for [lon, lat] coordinates, used for the
+ * lighter-weight line rendered on the routes overview map.
+ */
+export function simplifyLine(coords: LonLat[], toleranceM = 6): LonLat[] {
+  if (coords.length <= 2) return coords;
+  const xy = projectToXY(coords.map(([lon, lat]) => ({ lat, lon })));
+  const keep = douglasPeuckerKeep(xy, toleranceM);
   return coords.filter((_, i) => keep[i]);
 }
 
