@@ -117,6 +117,20 @@ export default async function RouteDetailPage({
             isSignedIn={!!user}
           />
           <a
+            href="#trip-reports"
+            className="flex min-h-11 items-center gap-2 rounded-full border border-parchment/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-parchment/80 transition-colors hover:border-amber hover:text-amber"
+          >
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.6}>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 5.5A1.5 1.5 0 014.5 4h11A1.5 1.5 0 0117 5.5v6A1.5 1.5 0 0115.5 13H9l-3.5 3v-3h-1A1.5 1.5 0 013 11.5v-6z"
+              />
+            </svg>
+            Comments
+            <span className="font-stats font-medium opacity-80">{route.comments.length}</span>
+          </a>
+          <a
             href={`/route/${route.id}/gpx`}
             download
             className="flex min-h-11 items-center gap-1.5 rounded-full border border-parchment/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-parchment/80 transition-colors hover:border-amber hover:text-amber"
@@ -132,10 +146,9 @@ export default async function RouteDetailPage({
           </a>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-3 gap-3">
           <Stat label="Distance" value={`${route.distanceKm.toFixed(1)} km`} />
           <Stat label="Elevation gain" value={`${route.elevationGainM} m`} />
-          <Stat label="Elevation loss" value={`${route.elevationLossM} m`} />
           <Stat label="Surface" value={route.surface} />
         </div>
 
@@ -195,7 +208,7 @@ export default async function RouteDetailPage({
           <PhotoGallery photos={route.photos} routeName={route.name} />
         </div>
 
-        <div className="mt-8">
+        <div id="trip-reports" className="mt-8 scroll-mt-6">
           <h2 className="mb-3 font-heading text-sm font-semibold uppercase tracking-wider text-parchment/70">
             Trip reports
           </h2>
