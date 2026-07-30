@@ -4,7 +4,9 @@ import { useRef } from "react";
 import type { TrackPoint } from "@/lib/geo";
 
 const WIDTH = 600;
-const HEIGHT = 160;
+const CHART_HEIGHT = 160;
+const HOVER_ROW_HEIGHT = 20;
+const HEIGHT = CHART_HEIGHT + HOVER_ROW_HEIGHT;
 const PAD_TOP = 12;
 const PAD_BOTTOM = 22;
 
@@ -26,7 +28,7 @@ export default function ElevationProfileChart({
   const minElevationM = Math.min(...elevations);
   const maxElevationM = Math.max(...elevations);
   const elevationRange = Math.max(1, maxElevationM - minElevationM);
-  const plotHeight = HEIGHT - PAD_TOP - PAD_BOTTOM;
+  const plotHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
 
   const toXY = (p: TrackPoint): [number, number] => {
     const x = (p.distanceKm / distanceKm) * WIDTH;
@@ -104,12 +106,12 @@ export default function ElevationProfileChart({
         {minElevationM}m
       </text>
 
-      <text x={0} y={HEIGHT - 4} className="font-stats" fontSize={11} fill="var(--forest-soft)">
+      <text x={0} y={CHART_HEIGHT - 4} className="font-stats" fontSize={11} fill="var(--forest-soft)">
         0 km
       </text>
       <text
         x={WIDTH}
-        y={HEIGHT - 4}
+        y={CHART_HEIGHT - 4}
         textAnchor="end"
         className="font-stats"
         fontSize={11}
@@ -117,6 +119,27 @@ export default function ElevationProfileChart({
       >
         {distanceKm.toFixed(1)} km
       </text>
+
+      {hoverXY && (
+        <g
+          transform={`translate(${Math.min(WIDTH - 24, Math.max(24, hoverXY[0]))},${
+            CHART_HEIGHT + HOVER_ROW_HEIGHT / 2
+          })`}
+        >
+          <rect x={-24} y={-9} width={48} height={18} rx={4} fill="var(--forest-soft)" stroke="var(--amber)" strokeWidth={1} />
+          <text
+            x={0}
+            y={4}
+            textAnchor="middle"
+            className="font-stats"
+            fontSize={11}
+            fontWeight={600}
+            fill="var(--amber)"
+          >
+            {track[hoverIndex!].distanceKm.toFixed(1)} km
+          </text>
+        </g>
+      )}
     </svg>
   );
 }
