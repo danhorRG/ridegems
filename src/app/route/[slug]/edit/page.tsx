@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { isAdminUser } from "@/lib/admin";
 import EditForm from "./EditForm";
 
 export const metadata: Metadata = {
@@ -23,17 +25,20 @@ export default async function EditRoutePage({
     redirect(`/login?next=/route/${slug}/edit`);
   }
 
-  // No status filter here (unlike the public route page) -- the "Owners
-  // can read their own routes" RLS policy is what scopes this to routes
-  // this user actually owns, working whether the route is currently
-  // pending or published.
-  const { data: route } = await supabase
+  const admin = isAdminUser(user);
+
+  // No status filter here (unlike the public route page) -- for a regular
+  // user the "Owners can read their own routes" RLS policy is what scopes
+  // this to routes they actually own, working whether the route is
+  // currently pending or published. Admins bypass RLS entirely (via the
+  // service-role client) so they can open and moderate any route.
+  const { data: route } = await (admin ? createSupabaseAdminClient() : supabase)
     .from("routes")
     .select("id,slug,name,description,difficulty,surface,why_recommended,created_by,track_points")
     .eq("slug", slug)
     .maybeSingle();
 
-  if (!route || route.created_by !== user.id) {
+  if (!route || (route.created_by !== user.id && !admin)) {
     notFound();
   }
 
@@ -61,6 +66,7 @@ export default async function EditRoutePage({
         lon: p.lon,
         url: p.url,
       }))}
+      canDelete={admin}
     />
   );
 }

@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { isAdminUser } from "@/lib/admin";
 import type { Difficulty, PoiCategory, Surface } from "@/types/route";
+import type { ElevationProfilePoint, LngLatBounds, TrackPoint } from "@/lib/geo";
 import { POI_CATEGORIES } from "@/lib/poi";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "moderate", "hard"];
@@ -66,6 +69,68 @@ export interface EditFormState {
   message?: string;
 }
 
+interface GpxReplacement {
+  distanceKm: number;
+  elevationGainM: number;
+  elevationLossM: number;
+  minElevationM: number;
+  maxElevationM: number;
+  coordinates: [number, number][];
+  profile: ElevationProfilePoint[];
+  bounds: LngLatBounds;
+  track: TrackPoint[];
+}
+
+/**
+ * The replacement GPX is parsed client-side (same as submit/SubmitForm.tsx)
+ * -- this only ever receives the small computed result, not the raw file.
+ * Returns undefined (not an error) when no replacement was uploaded, so the
+ * rest of the update proceeds without touching the track columns.
+ */
+function parseGpxReplacement(raw: string): { gpx: GpxReplacement | undefined } | { error: string } {
+  if (!raw) return { gpx: undefined };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { error: "Invalid GPX replacement data." };
+  }
+  if (typeof parsed !== "object" || parsed === null) return { error: "Invalid GPX replacement data." };
+  const { distanceKm, elevationGainM, elevationLossM, minElevationM, maxElevationM, coordinates, profile, bounds, track } =
+    parsed as Record<string, unknown>;
+
+  if (
+    typeof distanceKm !== "number" ||
+    typeof elevationGainM !== "number" ||
+    typeof elevationLossM !== "number" ||
+    typeof minElevationM !== "number" ||
+    typeof maxElevationM !== "number"
+  ) {
+    return { error: "Invalid GPX replacement stats." };
+  }
+  if (!Array.isArray(coordinates) || coordinates.length < 2 || distanceKm <= 0) {
+    return { error: "That GPX file doesn't have enough track points to plot a route." };
+  }
+  if (!Array.isArray(profile) || !Array.isArray(bounds) || !Array.isArray(track)) {
+    return { error: "Invalid GPX replacement data." };
+  }
+
+  return {
+    gpx: {
+      distanceKm,
+      elevationGainM,
+      elevationLossM,
+      minElevationM,
+      maxElevationM,
+      coordinates: coordinates as [number, number][],
+      profile: profile as ElevationProfilePoint[],
+      bounds: bounds as LngLatBounds,
+      track: track as TrackPoint[],
+    },
+  };
+}
+
 export async function updateRouteAction(
   _prevState: EditFormState,
   formData: FormData
@@ -77,6 +142,12 @@ export async function updateRouteAction(
   if (!user) {
     return { status: "error", message: "Sign in required." };
   }
+  const admin = isAdminUser(user);
+  // Admin edits (of routes they don't own) bypass RLS via the service-role
+  // client; everyone else keeps using the session-aware client so the
+  // "Owners can update their own routes" RLS policy still applies as a
+  // second line of defense, same as before.
+  const db = admin ? createSupabaseAdminClient() : supabase;
 
   const slug = String(formData.get("slug") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -94,6 +165,12 @@ export async function updateRouteAction(
   }
   const newPois = parsedPois.pois;
 
+  const parsedGpx = parseGpxReplacement(String(formData.get("gpxReplacement") ?? ""));
+  if ("error" in parsedGpx) {
+    return { status: "error", message: parsedGpx.error };
+  }
+  const gpx = parsedGpx.gpx;
+
   if (!name) return { status: "error", message: "Route name is required." };
   if (!description) return { status: "error", message: "Description is required." };
   if (!whyRecommended) {
@@ -109,11 +186,12 @@ export async function updateRouteAction(
     return { status: "error", message: "Choose a valid surface." };
   }
 
-  // Ownership check happens twice on purpose: the RLS update policy
-  // (auth.uid() = created_by) enforces it at the database level regardless,
-  // but checking here too lets us return a clear error instead of a silent
-  // no-op update.
-  const { data: route, error: fetchError } = await supabase
+  // Ownership check happens twice on purpose (for non-admins): the RLS
+  // update policy (auth.uid() = created_by) enforces it at the database
+  // level regardless, but checking here too lets us return a clear error
+  // instead of a silent no-op update. Admins skip the ownership check --
+  // that's the whole point of using the service-role client above.
+  const { data: route, error: fetchError } = await db
     .from("routes")
     .select("id,created_by")
     .eq("slug", slug)
@@ -121,11 +199,11 @@ export async function updateRouteAction(
   if (fetchError || !route) {
     return { status: "error", message: "Route not found." };
   }
-  if (route.created_by !== user.id) {
+  if (!admin && route.created_by !== user.id) {
     return { status: "error", message: "You can only edit routes you submitted." };
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await db
     .from("routes")
     .update({
       name,
@@ -133,6 +211,17 @@ export async function updateRouteAction(
       difficulty,
       surface,
       why_recommended: whyRecommended,
+      ...(gpx && {
+        distance_km: Math.round(gpx.distanceKm * 10) / 10,
+        elevation_gain_m: gpx.elevationGainM,
+        elevation_loss_m: gpx.elevationLossM,
+        min_elevation_m: gpx.minElevationM,
+        max_elevation_m: gpx.maxElevationM,
+        coordinates: gpx.coordinates,
+        profile: gpx.profile,
+        bounds: gpx.bounds,
+        track_points: gpx.track,
+      }),
     })
     .eq("id", route.id);
   if (updateError) {
@@ -140,15 +229,15 @@ export async function updateRouteAction(
   }
 
   if (removePhotoIds.length > 0) {
-    await supabase.from("route_photos").delete().in("id", removePhotoIds);
+    await db.from("route_photos").delete().in("id", removePhotoIds);
   }
 
   if (newPhotoUrls.length > 0) {
-    const { count } = await supabase
+    const { count } = await db
       .from("route_photos")
       .select("id", { count: "exact", head: true })
       .eq("route_id", route.id);
-    await supabase.from("route_photos").insert(
+    await db.from("route_photos").insert(
       newPhotoUrls.map((url, i) => ({
         route_id: route.id,
         url,
@@ -158,13 +247,41 @@ export async function updateRouteAction(
   }
 
   if (removePoiIds.length > 0) {
-    await supabase.from("route_pois").delete().in("id", removePoiIds);
+    await db.from("route_pois").delete().in("id", removePoiIds);
   }
 
   if (newPois.length > 0) {
-    await supabase.from("route_pois").insert(newPois.map((poi) => ({ route_id: route.id, ...poi })));
+    await db.from("route_pois").insert(newPois.map((poi) => ({ route_id: route.id, ...poi })));
   }
 
   revalidatePath(`/route/${slug}`);
+  return { status: "success" };
+}
+
+export interface DeleteRouteResult {
+  status: "error" | "success";
+  message?: string;
+}
+
+/**
+ * Admin-only: permanently removes a route (route_photos/route_pois cascade
+ * via their FK `on delete cascade`). Not exposed to regular owners --
+ * this repo has no "delete your own route" feature, only moderation.
+ */
+export async function deleteRouteAction(slug: string): Promise<DeleteRouteResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !isAdminUser(user)) {
+    return { status: "error", message: "Not authorized." };
+  }
+
+  const { error } = await createSupabaseAdminClient().from("routes").delete().eq("slug", slug);
+  if (error) {
+    return { status: "error", message: error.message };
+  }
+
+  revalidatePath("/");
   return { status: "success" };
 }

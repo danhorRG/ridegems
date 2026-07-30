@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { updateRouteAction, type EditFormState } from "./actions";
+import { updateRouteAction, deleteRouteAction, type EditFormState } from "./actions";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import PoiEditor, { type DraftPoi, type ExistingPoi } from "@/components/PoiEditor";
-import type { TrackPoint } from "@/lib/geo";
+import { parseGpx } from "@/lib/gpx";
+import { buildTrackPoints, simplifyLine, boundsOf, statsFromTrack, type TrackPoint } from "@/lib/geo";
+import { fetchElevations } from "@/lib/elevation";
 
 const initialState: EditFormState = { status: "idle" };
 
@@ -17,6 +20,11 @@ const PHOTO_CONTENT_TYPES: Record<string, string> = {
   ".png": "image/png",
   ".webp": "image/webp",
 };
+
+// Sanity guard only — GPX parsing happens in the browser, so there's no
+// server body-size limit to worry about. This just stops someone from
+// accidentally hanging their own browser on a mislabeled huge file.
+const MAX_GPX_BYTES = 30 * 1024 * 1024;
 
 const inputClass =
   "w-full rounded-lg border border-parchment/20 bg-forest-soft px-3 py-2 text-sm text-parchment placeholder:text-parchment/40 focus:border-amber focus:outline-none";
@@ -48,6 +56,7 @@ export default function EditForm({
   photos,
   track,
   pois,
+  canDelete = false,
 }: {
   slug: string;
   name: string;
@@ -58,12 +67,29 @@ export default function EditForm({
   photos: ExistingPhoto[];
   track: TrackPoint[];
   pois: ExistingPoi[];
+  canDelete?: boolean;
 }) {
+  const router = useRouter();
   const [result, setResult] = useState<EditFormState>(initialState);
   const [pending, startTransition] = useTransition();
+  const [deleting, setDeleting] = useState(false);
   const [whyLength, setWhyLength] = useState(whyRecommended.length);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [draftPois, setDraftPois] = useState<DraftPoi[]>([]);
+
+  function handleDelete() {
+    if (!window.confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    startTransition(async () => {
+      const response = await deleteRouteAction(slug);
+      if (response.status === "success") {
+        router.push("/");
+        return;
+      }
+      setDeleting(false);
+      setResult({ status: "error", message: response.message });
+    });
+  }
 
   function toggleRemove(id: string) {
     setRemovedIds((prev) => {
@@ -94,7 +120,72 @@ export default function EditForm({
       return;
     }
 
+    const gpxFile = formData.get("gpx");
+    const replacingGpx = gpxFile instanceof File && gpxFile.size > 0;
+    if (replacingGpx && (gpxFile as File).size > MAX_GPX_BYTES) {
+      setResult({
+        status: "error",
+        message: "That GPX file looks unusually large — double check it's a track export, not something else.",
+      });
+      return;
+    }
+
     startTransition(async () => {
+      let gpxReplacement: string | null = null;
+      if (replacingGpx) {
+        const gpxText = await (gpxFile as File).text();
+        let parsed;
+        try {
+          parsed = parseGpx(gpxText);
+        } catch {
+          setResult({
+            status: "error",
+            message: "Could not read that GPX file — make sure it's a valid track export.",
+          });
+          return;
+        }
+        if (parsed.points.length < 2) {
+          setResult({
+            status: "error",
+            message: "That GPX file doesn't have enough track points to plot a route.",
+          });
+          return;
+        }
+
+        const fullLine: [number, number][] = parsed.points.map((p) => [p.lon, p.lat]);
+        const coordinates = simplifyLine(fullLine, 6);
+        const bounds = boundsOf(coordinates);
+
+        let newTrack = buildTrackPoints(parsed.points);
+        const apiKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
+        if (apiKey) {
+          try {
+            const elevations = await fetchElevations(
+              newTrack.map((p) => ({ lon: p.lon, lat: p.lat })),
+              apiKey
+            );
+            newTrack = newTrack.map((p, i) => ({ ...p, elevationM: Math.round(elevations[i]) }));
+          } catch (err) {
+            console.warn("Elevation lookup failed, using GPX-reported elevation instead.", err);
+          }
+        }
+
+        const stats = statsFromTrack(newTrack);
+        const distanceKm = newTrack[newTrack.length - 1]?.distanceKm ?? 0;
+
+        gpxReplacement = JSON.stringify({
+          distanceKm,
+          elevationGainM: stats.elevationGainM,
+          elevationLossM: stats.elevationLossM,
+          minElevationM: stats.minElevationM,
+          maxElevationM: stats.maxElevationM,
+          coordinates,
+          profile: stats.profile,
+          bounds,
+          track: newTrack,
+        });
+      }
+
       const supabase = createSupabaseBrowserClient();
       const newPhotoUrls: string[] = [];
       for (const file of photoFiles) {
@@ -135,6 +226,7 @@ export default function EditForm({
         }));
       payload.set("newPois", JSON.stringify(newPois));
       for (const id of removePoiIds) payload.append("removePoiIds", id);
+      if (gpxReplacement) payload.set("gpxReplacement", gpxReplacement);
 
       const response = await updateRouteAction(initialState, payload);
       setResult(response);
@@ -188,6 +280,13 @@ export default function EditForm({
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5 pb-12">
           <Field label="Route name">
             <input name="name" type="text" required maxLength={120} defaultValue={name} className={inputClass} />
+          </Field>
+
+          <Field label="Replace GPX file (optional)">
+            <input name="gpx" type="file" accept=".gpx" className={inputClass} />
+            <span className="text-xs text-parchment/50">
+              Uploading a new track recalculates distance, elevation, and the map line. Leave empty to keep the current track.
+            </span>
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
@@ -275,6 +374,17 @@ export default function EditForm({
           >
             {pending ? "Saving…" : "Save changes"}
           </button>
+
+          {canDelete && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={pending}
+              className="rounded-full border border-rust/50 px-5 py-2.5 text-sm font-semibold uppercase tracking-wide text-rust transition-colors hover:bg-rust/10 disabled:opacity-60"
+            >
+              {deleting ? "Deleting…" : "Delete route"}
+            </button>
+          )}
         </form>
       </div>
     </div>
