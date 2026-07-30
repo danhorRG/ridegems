@@ -7,7 +7,6 @@ import RecommendButton from "@/components/RecommendButton";
 import RouteDetailInteractive from "@/components/RouteDetailInteractive";
 import { getRouteBySlug } from "@/lib/routes";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import { POI_LABELS, POI_COLORS } from "@/lib/poi";
 
 export async function generateMetadata({
   params,
@@ -237,46 +236,6 @@ export default async function RouteDetailPage({
           )}
         </div>
 
-        <div className="mt-8 pb-8">
-          <h2 className="font-heading text-sm font-semibold uppercase tracking-wider text-parchment/70">
-            Points of interest
-          </h2>
-          {route.pois.length === 0 ? (
-            <p className="mt-2 text-sm text-parchment/50">No points of interest added yet.</p>
-          ) : (
-            <ul className="mt-3 flex flex-col gap-2">
-              {route.pois.map((poi) => (
-                <li
-                  key={poi.id}
-                  className="flex items-start gap-3 rounded-lg border border-parchment/15 px-3 py-2.5"
-                >
-                  <span
-                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: POI_COLORS[poi.category] }}
-                  />
-                  <div>
-                    <div className="font-heading text-xs font-semibold uppercase tracking-wide text-parchment">
-                      {poi.name} <span className="text-parchment/40">&middot; {POI_LABELS[poi.category]}</span>
-                    </div>
-                    {poi.description && (
-                      <p className="mt-0.5 text-sm text-parchment/70">{poi.description}</p>
-                    )}
-                    {poi.url && (
-                      <a
-                        href={poi.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-0.5 inline-block text-xs font-semibold uppercase tracking-wide text-amber hover:underline"
-                      >
-                        Visit website ↗
-                      </a>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       </div>
     </div>
   );
