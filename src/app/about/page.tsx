@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "About",
+  description:
+    "Why RideGems exists: curated, locally-recommended cycling routes kept fresh by real trip reports — not another dump of random GPS tracks.",
+};
 
 export default function AboutPage() {
   return (
@@ -33,6 +40,19 @@ export default function AboutPage() {
             reports, road closures, or new spots make the collection even more valuable.
           </p>
           <p>Together, we can build a truly useful guide for everyone.</p>
+        </div>
+
+        <div className="mt-8 border-t border-parchment/10 pt-6 text-sm leading-relaxed text-parchment/80 sm:text-base">
+          <p>
+            Questions, feedback, or just want to say hi? Drop us a line at{" "}
+            <a
+              href="mailto:hello@ridegems.eu"
+              className="text-amber transition-colors hover:text-amber-hover"
+            >
+              hello@ridegems.eu
+            </a>{" "}
+            — we&apos;d love to hear from you.
+          </p>
         </div>
       </div>
     </div>
