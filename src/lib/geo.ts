@@ -37,20 +37,34 @@ export interface TrackStats {
 }
 
 /**
+ * Above this many points, per-point spacing gets tight enough that terrain-DEM
+ * lookup noise (a few meters, more in steep alpine terrain) exceeds the
+ * default 3m hysteresis threshold repeatedly and compounds into large
+ * spurious gain/loss over a long track. Dense tracks use a wider threshold
+ * to filter that out; shorter/sparser tracks keep the original 3m, which
+ * matches real GPS/barometric noise amplitude and shouldn't change.
+ */
+const DENSE_TRACK_POINT_COUNT = 1000;
+const DENSE_TRACK_THRESHOLD_M = 18;
+
+/**
  * Elevation gain/loss via the "hysteresis" method: only count a change once
  * cumulative movement since the last reference point exceeds `thresholdM`.
  * This filters GPS/barometric noise that would otherwise inflate gain on
  * every tiny up/down wobble in the recorded track.
  */
-function computeElevationGainLoss(elevations: number[], thresholdM = 3) {
+function computeElevationGainLoss(elevations: number[], thresholdM?: number) {
   let gain = 0;
   let loss = 0;
   if (elevations.length === 0) return { gain, loss };
 
+  const threshold =
+    thresholdM ?? (elevations.length > DENSE_TRACK_POINT_COUNT ? DENSE_TRACK_THRESHOLD_M : 3);
+
   let ref = elevations[0];
   for (let i = 1; i < elevations.length; i++) {
     const diff = elevations[i] - ref;
-    if (Math.abs(diff) < thresholdM) continue;
+    if (Math.abs(diff) < threshold) continue;
     if (diff > 0) gain += diff;
     else loss += -diff;
     ref = elevations[i];
