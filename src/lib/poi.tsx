@@ -40,7 +40,9 @@ export const POI_COLORS: Record<PoiCategory, string> = {
 // with currentColor at strokeWidth 1.6-1.8 to match the hand-rolled icon
 // style already used elsewhere in the app (e.g. the GPX download icon).
 export const POI_ICON_PATHS: Record<PoiCategory, string> = {
-  viewpoint: '<path d="M2 15.5l4.5-6 2.5 3 3-4.5 5.5 7.5H2z"/>',
+  viewpoint:
+    '<path d="M2 10Q10 3 18 10Q10 17 2 10Z"/>' +
+    '<circle cx="10" cy="10" r="2.2"/>',
   cafe:
     '<path d="M4.5 8h8v4.5a3.5 3.5 0 01-3.5 3.5h-1A3.5 3.5 0 014.5 12.5V8z"/>' +
     '<path d="M12.5 9h1a1.8 1.8 0 010 3.6h-1"/>' +
@@ -51,7 +53,7 @@ export const POI_ICON_PATHS: Record<PoiCategory, string> = {
     '<path d="M3 16h14M4 16V9M7 16V9M10 16V9M13 16V9M16 16V9M2.5 9L10 4l7.5 5"/>',
   bike_shop:
     '<path d="M13.5 3.5a3.5 3.5 0 00-4.6 4.2L3 13.6V17h3.4l5.9-5.9a3.5 3.5 0 004.2-4.6l-2.6 2.6-2-2 2.6-2.6z"/>',
-  climb: '<path d="M3 15.5L9 9.5l2.5 2.5L17 5.5"/><path d="M12 5.5h5v5"/>',
+  climb: '<path d="M2 15.5l4.5-6 2.5 3 3-4.5 5.5 7.5H2z"/>',
   hazard:
     '<path d="M10 3.5L17.5 16h-15L10 3.5z"/>' +
     '<path d="M10 8.5v3.2"/>' +
