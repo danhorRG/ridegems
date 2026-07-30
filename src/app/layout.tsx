@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Oswald, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import { siteConfig } from "@/lib/siteConfig";
 
 const oswald = Oswald({
   variable: "--font-oswald",
@@ -15,8 +16,24 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RideGems",
-  description: "Discover and filter cycling routes on a map.",
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: siteConfig.name,
+    template: `%s — ${siteConfig.name}`,
+  },
+  description: siteConfig.description,
+  openGraph: {
+    type: "website",
+    siteName: siteConfig.name,
+    title: siteConfig.name,
+    description: siteConfig.description,
+    url: siteConfig.url,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteConfig.name,
+    description: siteConfig.description,
+  },
 };
 
 export const viewport = {

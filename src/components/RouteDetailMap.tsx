@@ -1,10 +1,32 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Polyline, CircleMarker, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, CircleMarker, Marker, Popup, useMap, useMapEvents } from "react-leaflet";
+import L from "leaflet";
 import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { TrackPoint } from "@/lib/geo";
+import type { PoiCategory } from "@/types/route";
+import { POI_LABELS, poiDivIconHtml } from "@/lib/poi";
+
+export interface PoiMarkerData {
+  key: string;
+  lat: number;
+  lon: number;
+  category: PoiCategory;
+  name: string;
+  description: string | null;
+  url: string | null;
+}
+
+function poiIcon(category: PoiCategory) {
+  return L.divIcon({
+    html: poiDivIconHtml(category),
+    className: "",
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+  });
+}
 
 function FitToTrack({ positions }: { positions: LatLngTuple[] }) {
   const map = useMap();
@@ -51,14 +73,37 @@ function HoverLayer({
   return null;
 }
 
+function ClickToPlaceLayer({
+  placing,
+  onMapClick,
+}: {
+  placing: boolean;
+  onMapClick: (lat: number, lon: number) => void;
+}) {
+  useMapEvents({
+    click(e) {
+      if (placing) onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
 export default function RouteDetailMap({
   track,
   hoverIndex,
   onHoverIndexChange,
+  pois = [],
+  placing = false,
+  onMapClick,
+  onRemovePoi,
 }: {
   track: TrackPoint[];
   hoverIndex: number | null;
   onHoverIndexChange: (index: number | null) => void;
+  pois?: PoiMarkerData[];
+  placing?: boolean;
+  onMapClick?: (lat: number, lon: number) => void;
+  onRemovePoi?: (key: string) => void;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
   const positions = useMemo<LatLngTuple[]>(() => track.map((p) => [p.lat, p.lon]), [track]);
@@ -97,6 +142,41 @@ export default function RouteDetailMap({
           interactive={false}
         />
       )}
+
+      {onMapClick && <ClickToPlaceLayer placing={placing} onMapClick={onMapClick} />}
+
+      {pois.map((poi) => (
+        <Marker key={poi.key} position={[poi.lat, poi.lon]} icon={poiIcon(poi.category)}>
+          <Popup>
+            <div className="min-w-[10rem] text-sm">
+              <div className="font-semibold">{poi.name}</div>
+              <div className="text-xs uppercase tracking-wide text-neutral-500">
+                {POI_LABELS[poi.category]}
+              </div>
+              {poi.description && <p className="mt-1">{poi.description}</p>}
+              {poi.url && (
+                <a
+                  href={poi.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 block text-amber-hover underline"
+                >
+                  Visit website ↗
+                </a>
+              )}
+              {onRemovePoi && (
+                <button
+                  type="button"
+                  onClick={() => onRemovePoi(poi.key)}
+                  className="mt-2 text-xs font-semibold uppercase tracking-wide text-rust"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </Popup>
+        </Marker>
+      ))}
     </MapContainer>
   );
 }

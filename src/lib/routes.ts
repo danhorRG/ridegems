@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { supabase } from "./supabase";
 import type { Difficulty, PoiCategory, Route, RouteDetail, Surface } from "@/types/route";
 
@@ -62,21 +63,25 @@ interface RouteDetailRow extends RouteRow {
   created_by: string | null;
   route_photos: { url: string; caption: string | null }[];
   route_pois: {
+    id: string;
     name: string;
     description: string | null;
     category: string;
     lat: number;
     lon: number;
+    url: string | null;
   }[];
   route_comments: { author_name: string; body: string; created_at: string }[];
 }
 
 const ROUTE_DETAIL_COLUMNS =
   `${ROUTE_COLUMNS}, description, why_recommended, highlights, track_points, created_by, ` +
-  "route_photos(url,caption), route_pois(name,description,category,lat,lon), " +
+  "route_photos(url,caption), route_pois(id,name,description,category,lat,lon,url), " +
   "route_comments(author_name,body,created_at)";
 
-export async function getRouteBySlug(slug: string): Promise<RouteDetail | null> {
+export const getRouteBySlug = cache(async function getRouteBySlug(
+  slug: string
+): Promise<RouteDetail | null> {
   const { data, error } = await supabase
     .from("routes")
     .select(ROUTE_DETAIL_COLUMNS)
@@ -110,4 +115,4 @@ export async function getRouteBySlug(slug: string): Promise<RouteDetail | null> 
       createdAt: c.created_at,
     })),
   };
-}
+});

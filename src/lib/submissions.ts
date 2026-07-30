@@ -45,10 +45,10 @@ export type SubmitRouteResult = { ok: true; name: string } | { ok: false; messag
  * behind login so every route has an attributed owner who can edit it
  * later, and so the RLS insert policy can require auth.uid() is not null).
  *
- * Inserted with status='pending' via the session-aware server client —
- * safe because the RLS insert policy on `routes` only ever permits
- * status='pending' rows — nothing a submitter sends can go live without
- * being manually flipped to 'published' in the Supabase table editor.
+ * Inserted with status='published' via the session-aware server client —
+ * the RLS insert policy on `routes` only ever permits status='published'
+ * rows from a signed-in user, so submissions go live immediately rather
+ * than sitting in a manual moderation queue.
  *
  * The row's id is generated here rather than read back from the insert
  * response to sidestep a Postgres RLS gotcha with INSERT...RETURNING
@@ -110,7 +110,7 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
       highlights: [],
       track_points: input.track,
       recommendation_count: 0,
-      status: "pending",
+      status: "published",
       created_by: user.id,
     });
 

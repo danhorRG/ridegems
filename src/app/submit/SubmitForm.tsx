@@ -170,8 +170,8 @@ export default function SubmitForm() {
             Thanks!
           </h1>
           <p className="mt-3 text-sm text-parchment/80">
-            <span className="font-semibold text-parchment">{result.routeName}</span> has been
-            submitted and is awaiting review before it appears on the map.
+            <span className="font-semibold text-parchment">{result.routeName}</span> is live on
+            the map now.
           </p>
           <Link
             href="/"

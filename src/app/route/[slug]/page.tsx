@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CommentForm from "@/components/CommentForm";
@@ -6,7 +7,38 @@ import RecommendButton from "@/components/RecommendButton";
 import RouteDetailInteractive from "@/components/RouteDetailInteractive";
 import { getRouteBySlug } from "@/lib/routes";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import type { PoiCategory } from "@/types/route";
+import { POI_LABELS, POI_COLORS } from "@/lib/poi";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const route = await getRouteBySlug(slug);
+  if (!route) return {};
+
+  const description =
+    route.whyRecommended || route.description?.slice(0, 200) || undefined;
+  const images = route.photos[0] ? [route.photos[0].url] : ["/opengraph-image"];
+
+  return {
+    title: route.name,
+    description,
+    openGraph: {
+      type: "article",
+      title: route.name,
+      description,
+      images,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: route.name,
+      description,
+      images,
+    },
+  };
+}
 
 function formatCommentDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -18,22 +50,6 @@ const DIFFICULTY_BADGE: Record<string, string> = {
   easy: "bg-moss text-forest",
   moderate: "bg-amber text-forest",
   hard: "bg-rust text-parchment",
-};
-
-const POI_LABELS: Record<PoiCategory, string> = {
-  viewpoint: "Viewpoint",
-  water: "Water",
-  food: "Food",
-  hazard: "Hazard",
-  other: "Point of interest",
-};
-
-const POI_DOT: Record<PoiCategory, string> = {
-  viewpoint: "bg-amber",
-  water: "bg-moss",
-  food: "bg-moss",
-  hazard: "bg-rust",
-  other: "bg-forest-soft",
 };
 
 export default async function RouteDetailPage({
@@ -103,7 +119,7 @@ export default async function RouteDetailPage({
           <a
             href={`/route/${route.id}/gpx`}
             download
-            className="flex items-center gap-1.5 rounded-full border border-parchment/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-parchment/80 transition-colors hover:border-amber hover:text-amber"
+            className="flex min-h-11 items-center gap-1.5 rounded-full border border-parchment/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-parchment/80 transition-colors hover:border-amber hover:text-amber"
           >
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.6}>
               <path
@@ -143,7 +159,18 @@ export default async function RouteDetailPage({
           </div>
         )}
 
-        <RouteDetailInteractive track={route.track} />
+        <RouteDetailInteractive
+          track={route.track}
+          pois={route.pois.map((poi) => ({
+            key: poi.id,
+            lat: poi.lat,
+            lon: poi.lon,
+            category: poi.category,
+            name: poi.name,
+            description: poi.description,
+            url: poi.url,
+          }))}
+        />
 
         {route.highlights.length > 0 && (
           <div className="mt-8">
@@ -207,16 +234,29 @@ export default async function RouteDetailPage({
             <ul className="mt-3 flex flex-col gap-2">
               {route.pois.map((poi) => (
                 <li
-                  key={poi.name}
+                  key={poi.id}
                   className="flex items-start gap-3 rounded-lg border border-parchment/15 px-3 py-2.5"
                 >
-                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${POI_DOT[poi.category]}`} />
+                  <span
+                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: POI_COLORS[poi.category] }}
+                  />
                   <div>
                     <div className="font-heading text-xs font-semibold uppercase tracking-wide text-parchment">
                       {poi.name} <span className="text-parchment/40">&middot; {POI_LABELS[poi.category]}</span>
                     </div>
                     {poi.description && (
                       <p className="mt-0.5 text-sm text-parchment/70">{poi.description}</p>
+                    )}
+                    {poi.url && (
+                      <a
+                        href={poi.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-0.5 inline-block text-xs font-semibold uppercase tracking-wide text-amber hover:underline"
+                      >
+                        Visit website ↗
+                      </a>
                     )}
                   </div>
                 </li>

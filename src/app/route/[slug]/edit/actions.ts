@@ -2,10 +2,64 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import type { Difficulty, Surface } from "@/types/route";
+import type { Difficulty, PoiCategory, Surface } from "@/types/route";
+import { POI_CATEGORIES } from "@/lib/poi";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "moderate", "hard"];
 const SURFACES: Surface[] = ["paved", "gravel", "mixed"];
+
+interface NewPoiInput {
+  name: string;
+  description: string | null;
+  category: string;
+  lat: number;
+  lon: number;
+  url: string | null;
+}
+
+function parseNewPois(raw: string): { pois: NewPoiInput[] } | { error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { error: "Invalid point of interest data." };
+  }
+  if (!Array.isArray(parsed)) return { error: "Invalid point of interest data." };
+
+  const pois: NewPoiInput[] = [];
+  for (const item of parsed) {
+    if (typeof item !== "object" || item === null) return { error: "Invalid point of interest data." };
+    const { name, description, category, lat, lon, url } = item as Record<string, unknown>;
+    if (typeof name !== "string" || !name.trim() || name.length > 120) {
+      return { error: "Each point of interest needs a name (120 characters or fewer)." };
+    }
+    if (typeof category !== "string" || !POI_CATEGORIES.includes(category as PoiCategory)) {
+      return { error: "Choose a valid category for each point of interest." };
+    }
+    if (typeof lat !== "number" || !Number.isFinite(lat) || typeof lon !== "number" || !Number.isFinite(lon)) {
+      return { error: "Invalid point of interest location." };
+    }
+    if (description !== null && typeof description === "string" && description.length > 500) {
+      return { error: "Point of interest descriptions must be 500 characters or fewer." };
+    }
+    if (url !== null && typeof url === "string" && url.trim()) {
+      try {
+        new URL(url);
+      } catch {
+        return { error: "Point of interest links must be valid URLs." };
+      }
+    }
+    pois.push({
+      name: name.trim(),
+      description: typeof description === "string" && description.trim() ? description.trim() : null,
+      category,
+      lat,
+      lon,
+      url: typeof url === "string" && url.trim() ? url.trim() : null,
+    });
+  }
+  return { pois };
+}
 
 export interface EditFormState {
   status: "idle" | "error" | "success";
@@ -32,6 +86,13 @@ export async function updateRouteAction(
   const whyRecommended = String(formData.get("whyRecommended") ?? "").trim();
   const newPhotoUrls = formData.getAll("newPhotoUrls").map(String).filter(Boolean);
   const removePhotoIds = formData.getAll("removePhotoIds").map(String).filter(Boolean);
+  const removePoiIds = formData.getAll("removePoiIds").map(String).filter(Boolean);
+
+  const parsedPois = parseNewPois(String(formData.get("newPois") ?? "[]"));
+  if ("error" in parsedPois) {
+    return { status: "error", message: parsedPois.error };
+  }
+  const newPois = parsedPois.pois;
 
   if (!name) return { status: "error", message: "Route name is required." };
   if (!description) return { status: "error", message: "Description is required." };
@@ -72,8 +133,6 @@ export async function updateRouteAction(
       difficulty,
       surface,
       why_recommended: whyRecommended,
-      // Back to pending so an edit gets reviewed before going live again.
-      status: "pending",
     })
     .eq("id", route.id);
   if (updateError) {
@@ -96,6 +155,14 @@ export async function updateRouteAction(
         sort_order: (count ?? 0) + i,
       }))
     );
+  }
+
+  if (removePoiIds.length > 0) {
+    await supabase.from("route_pois").delete().in("id", removePoiIds);
+  }
+
+  if (newPois.length > 0) {
+    await supabase.from("route_pois").insert(newPois.map((poi) => ({ route_id: route.id, ...poi })));
   }
 
   revalidatePath(`/route/${slug}`);

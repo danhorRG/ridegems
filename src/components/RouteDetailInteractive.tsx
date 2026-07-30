@@ -4,6 +4,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import ElevationProfileChart from "./ElevationProfileChart";
 import type { TrackPoint } from "@/lib/geo";
+import type { PoiMarkerData } from "./RouteDetailMap";
 
 // Leaflet touches `window` at module load time, so it must never run
 // during SSR — load it client-only, same as the overview MapView.
@@ -18,13 +19,33 @@ const RouteDetailMap = dynamic(() => import("./RouteDetailMap"), {
   ),
 });
 
-export default function RouteDetailInteractive({ track }: { track: TrackPoint[] }) {
+export default function RouteDetailInteractive({
+  track,
+  pois,
+  placing,
+  onMapClick,
+  onRemovePoi,
+}: {
+  track: TrackPoint[];
+  pois?: PoiMarkerData[];
+  placing?: boolean;
+  onMapClick?: (lat: number, lon: number) => void;
+  onRemovePoi?: (key: string) => void;
+}) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   return (
     <div className="mt-8 flex flex-col gap-3">
       <div className="h-56 w-full overflow-hidden rounded-xl sm:h-72">
-        <RouteDetailMap track={track} hoverIndex={hoverIndex} onHoverIndexChange={setHoverIndex} />
+        <RouteDetailMap
+          track={track}
+          hoverIndex={hoverIndex}
+          onHoverIndexChange={setHoverIndex}
+          pois={pois}
+          placing={placing}
+          onMapClick={onMapClick}
+          onRemovePoi={onRemovePoi}
+        />
       </div>
 
       <div className="rounded-xl bg-parchment p-4 sm:p-5">

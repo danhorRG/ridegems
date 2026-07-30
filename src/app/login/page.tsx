@@ -38,7 +38,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => setMode("signin")}
-            className={`flex-1 rounded-full py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
+            className={`flex min-h-11 flex-1 items-center justify-center rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${
               mode === "signin" ? "bg-amber text-forest" : "text-parchment/60 hover:text-parchment"
             }`}
           >
@@ -47,7 +47,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => setMode("signup")}
-            className={`flex-1 rounded-full py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
+            className={`flex min-h-11 flex-1 items-center justify-center rounded-full text-xs font-semibold uppercase tracking-wide transition-colors ${
               mode === "signup" ? "bg-amber text-forest" : "text-parchment/60 hover:text-parchment"
             }`}
           >

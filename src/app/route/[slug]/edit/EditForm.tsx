@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { updateRouteAction, type EditFormState } from "./actions";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
+import PoiEditor, { type DraftPoi, type ExistingPoi } from "@/components/PoiEditor";
+import type { TrackPoint } from "@/lib/geo";
 
 const initialState: EditFormState = { status: "idle" };
 
@@ -44,6 +46,8 @@ export default function EditForm({
   surface,
   whyRecommended,
   photos,
+  track,
+  pois,
 }: {
   slug: string;
   name: string;
@@ -52,11 +56,14 @@ export default function EditForm({
   surface: string;
   whyRecommended: string;
   photos: ExistingPhoto[];
+  track: TrackPoint[];
+  pois: ExistingPoi[];
 }) {
   const [result, setResult] = useState<EditFormState>(initialState);
   const [pending, startTransition] = useTransition();
   const [whyLength, setWhyLength] = useState(whyRecommended.length);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+  const [draftPois, setDraftPois] = useState<DraftPoi[]>([]);
 
   function toggleRemove(id: string) {
     setRemovedIds((prev) => {
@@ -115,6 +122,20 @@ export default function EditForm({
       for (const url of newPhotoUrls) payload.append("newPhotoUrls", url);
       for (const id of removedIds) payload.append("removePhotoIds", id);
 
+      const removePoiIds = draftPois.filter((p) => p.id && p.removed).map((p) => p.id as string);
+      const newPois = draftPois
+        .filter((p) => !p.id && !p.removed)
+        .map(({ name, description, category, lat, lon, url }) => ({
+          name,
+          description: description || null,
+          category,
+          lat,
+          lon,
+          url: url || null,
+        }));
+      payload.set("newPois", JSON.stringify(newPois));
+      for (const id of removePoiIds) payload.append("removePoiIds", id);
+
       const response = await updateRouteAction(initialState, payload);
       setResult(response);
     });
@@ -128,7 +149,7 @@ export default function EditForm({
             Saved
           </h1>
           <p className="mt-3 text-sm text-parchment/80">
-            Your changes are saved and awaiting review before the route goes live again.
+            Your changes are saved and live.
           </p>
           <Link
             href="/"
@@ -155,7 +176,7 @@ export default function EditForm({
           Edit route
         </h1>
         <p className="mt-2 text-sm text-parchment/70">
-          Saving changes sends this route back for review before it&apos;s live again.
+          Changes go live immediately once you save.
         </p>
 
         {result.status === "error" && result.message && (
@@ -244,6 +265,8 @@ export default function EditForm({
           <Field label="Add photos (optional, max 1MB each)">
             <input name="newPhotos" type="file" accept="image/*" multiple className={inputClass} />
           </Field>
+
+          <PoiEditor track={track} initialPois={pois} onChange={setDraftPois} />
 
           <button
             type="submit"

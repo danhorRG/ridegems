@@ -23,7 +23,7 @@ function ThumbIcon({ filled }: { filled: boolean }) {
 }
 
 const buttonClass = (recommended: boolean) =>
-  `flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
+  `flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
     recommended
       ? "border-amber bg-amber text-forest"
       : "border-parchment/30 text-parchment/80 hover:border-amber hover:text-amber"
