@@ -9,6 +9,11 @@ export default async function Home() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const userName = user
+    ? typeof user.user_metadata?.full_name === "string"
+      ? user.user_metadata.full_name
+      : ""
+    : null;
 
-  return <AppShell routes={routes} userEmail={user?.email ?? null} />;
+  return <AppShell routes={routes} userName={userName} />;
 }

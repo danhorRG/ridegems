@@ -27,10 +27,10 @@ const MapView = dynamic(() => import("./MapView"), {
 
 export default function AppShell({
   routes,
-  userEmail,
+  userName,
 }: {
   routes: Route[];
-  userEmail: string | null;
+  userName: string | null;
 }) {
   const viewportHeight = useViewportHeight();
   const [filters, setFilters] = useState<FilterState>(() => defaultFilterState(routes));
@@ -69,7 +69,7 @@ export default function AppShell({
       style={{ height: viewportHeight ? `${viewportHeight}px` : "100dvh" }}
     >
       <Sidebar
-        userEmail={userEmail}
+        userName={userName}
         totalCount={routes.length}
         visibleCount={visibleRoutes.length}
         displayedRoutes={sidebarRoutes}

@@ -1,4 +1,5 @@
 import { cache } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import type { Difficulty, PoiCategory, Route, RouteDetail, Surface } from "@/types/route";
 
@@ -78,6 +79,52 @@ const ROUTE_DETAIL_COLUMNS =
   `${ROUTE_COLUMNS}, description, why_recommended, highlights, track_points, created_by, ` +
   "route_photos(url,caption), route_pois(id,name,description,category,lat,lon,url), " +
   "route_comments(author_name,body,created_at)";
+
+export interface OwnedRoute {
+  slug: string;
+  name: string;
+  status: "pending" | "published";
+  difficulty: Difficulty;
+  distanceKm: number;
+  createdAt: string;
+}
+
+/**
+ * Routes created by `userId`, any status (pending or published). Must be
+ * called with a session-aware client (supabaseServer/supabaseBrowser) --
+ * the "Owners can read their own routes" RLS policy is what actually
+ * grants visibility into non-published rows here.
+ */
+export async function getRoutesByUser(
+  db: SupabaseClient,
+  userId: string
+): Promise<OwnedRoute[]> {
+  const { data, error } = await db
+    .from("routes")
+    .select("slug,name,status,difficulty,distance_km,created_at")
+    .eq("created_by", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to load your routes: ${error.message}`);
+  }
+
+  return (data as unknown as {
+    slug: string;
+    name: string;
+    status: string;
+    difficulty: string;
+    distance_km: number;
+    created_at: string;
+  }[]).map((row) => ({
+    slug: row.slug,
+    name: row.name,
+    status: row.status as "pending" | "published",
+    difficulty: row.difficulty as Difficulty,
+    distanceKm: row.distance_km,
+    createdAt: row.created_at,
+  }));
+}
 
 export const getRouteBySlug = cache(async function getRouteBySlug(
   slug: string

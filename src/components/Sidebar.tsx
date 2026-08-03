@@ -12,15 +12,19 @@ const SORT_LABELS: Record<SortMode, string> = {
   recent: "Most recently added",
 };
 
-function AuthStatus({ userEmail, className = "" }: { userEmail: string | null; className?: string }) {
-  if (userEmail) {
+/** `userName` is null when signed out, "" when signed in but no name set yet. */
+function AuthStatus({ userName, className = "" }: { userName: string | null; className?: string }) {
+  if (userName !== null) {
     return (
-      <div className={`flex items-center gap-2 font-stats text-xs text-forest/60 ${className}`}>
-        <span className="truncate">{userEmail}</span>
+      <div className={`flex items-center gap-2 font-stats text-xs tracking-wide ${className}`}>
+        <Link href="/account" className="truncate text-forest/70 hover:text-forest">
+          {userName || "Account"}
+        </Link>
+        <span className="text-forest/25">&middot;</span>
         <button
           type="button"
           onClick={() => signOutAction()}
-          className="shrink-0 uppercase tracking-wide text-forest/50 underline-offset-2 hover:text-forest hover:underline"
+          className="shrink-0 uppercase text-forest/45 underline-offset-2 hover:text-forest hover:underline"
         >
           Sign out
         </button>
@@ -38,7 +42,7 @@ function AuthStatus({ userEmail, className = "" }: { userEmail: string | null; c
 }
 
 interface SidebarProps {
-  userEmail: string | null;
+  userName: string | null;
   totalCount: number;
   visibleCount: number;
   displayedRoutes: Route[];
@@ -55,7 +59,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({
-  userEmail,
+  userName,
   totalCount,
   visibleCount,
   displayedRoutes,
@@ -114,24 +118,24 @@ export default function Sidebar({
             <span className="font-heading text-2xl font-bold uppercase tracking-wider text-forest">
               RideGems
             </span>
-            <Link
-              href="/submit"
-              className="mt-1 shrink-0 rounded-full border border-forest/20 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-forest/70 hover:border-amber hover:text-forest"
-            >
-              + Submit
-            </Link>
+            <AuthStatus userName={userName} className="mt-1.5" />
           </div>
-          <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="mt-2 flex items-center justify-between gap-2">
             <span className="font-stats text-xs text-forest/60">
               {displayedRoutes.length} of {visibleCount} routes in view
             </span>
-            <AuthStatus userEmail={userEmail} />
+            <Link
+              href="/submit"
+              className="shrink-0 rounded-full border border-forest/20 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-forest/70 hover:border-amber hover:text-forest"
+            >
+              + Submit
+            </Link>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:pb-5">
           <div className="mb-4 flex items-center justify-between gap-2 md:hidden">
-            <AuthStatus userEmail={userEmail} />
+            <AuthStatus userName={userName} />
           </div>
 
           <Link

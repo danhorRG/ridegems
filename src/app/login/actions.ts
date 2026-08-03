@@ -2,9 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import { siteConfig } from "@/lib/siteConfig";
 
 export interface AuthFormState {
-  status: "idle" | "error" | "check-email";
+  status: "idle" | "error" | "check-email" | "reset-sent";
   message?: string;
 }
 
@@ -38,18 +39,26 @@ export async function signUpAction(
   _prevState: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
+  const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  if (!email || !password) {
-    return { status: "error", message: "Email and password are required." };
+  if (!name || !email || !password) {
+    return { status: "error", message: "Name, email, and password are required." };
+  }
+  if (name.length > 80) {
+    return { status: "error", message: "Name must be 80 characters or fewer." };
   }
   if (password.length < 6) {
     return { status: "error", message: "Password must be at least 6 characters." };
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: name } },
+  });
   if (error) {
     return { status: "error", message: error.message };
   }
@@ -61,6 +70,25 @@ export async function signUpAction(
     redirect(safeNextPath(formData));
   }
   return { status: "check-email" };
+}
+
+export async function requestPasswordResetAction(
+  _prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) {
+    return { status: "error", message: "Email is required." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteConfig.url}/auth/callback?next=/account/reset-password`,
+  });
+
+  // Always show the same message regardless of whether the email is
+  // registered -- avoids leaking which emails have accounts.
+  return { status: "reset-sent" };
 }
 
 export async function signOutAction() {
