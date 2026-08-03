@@ -5,6 +5,7 @@ import CommentForm from "@/components/CommentForm";
 import PhotoGallery from "@/components/PhotoGallery";
 import RecommendButton from "@/components/RecommendButton";
 import RouteDetailInteractive from "@/components/RouteDetailInteractive";
+import { isAdminUser } from "@/lib/admin";
 import { getRouteBySlug } from "@/lib/routes";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 
@@ -99,7 +100,7 @@ export default async function RouteDetailPage({
           </span>
         </div>
 
-        {user && route.createdBy === user.id && (
+        {user && (route.createdBy === user.id || isAdminUser(user)) && (
           <Link
             href={`/route/${route.id}/edit`}
             className="mt-1 inline-block font-stats text-xs uppercase tracking-wide text-amber hover:underline"
