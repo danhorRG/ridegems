@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { submitRoutePayload, type SubmitFormState } from "./actions";
 import { parseGpx } from "@/lib/gpx";
@@ -45,6 +45,22 @@ export default function SubmitForm() {
   const [result, setResult] = useState<SubmitFormState>(initialState);
   const [pending, startTransition] = useTransition();
   const [whyLength, setWhyLength] = useState(0);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoCaptions, setPhotoCaptions] = useState<string[]>([]);
+
+  const photoPreviewUrls = useMemo(
+    () => photoFiles.map((f) => URL.createObjectURL(f)),
+    [photoFiles]
+  );
+  useEffect(() => {
+    return () => photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  }, [photoPreviewUrls]);
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    setPhotoFiles(files);
+    setPhotoCaptions(files.map(() => ""));
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -60,9 +76,6 @@ export default function SubmitForm() {
       setResult({ status: "error", message: "That GPX file looks unusually large — double check it's a track export, not something else." });
       return;
     }
-    const photoFiles = formData
-      .getAll("photos")
-      .filter((f): f is File => f instanceof File && f.size > 0);
 
     const oversizedPhotos = photoFiles.filter((f) => f.size > MAX_PHOTO_BYTES);
     if (oversizedPhotos.length > 0) {
@@ -125,8 +138,9 @@ export default function SubmitForm() {
       // body limit either. Session-aware client so the storage insert
       // policy (auth.uid() is not null) can see who's uploading.
       const supabase = createSupabaseBrowserClient();
-      const photoUrls: string[] = [];
-      for (const file of photoFiles) {
+      const photos: { url: string; caption: string | null }[] = [];
+      for (let i = 0; i < photoFiles.length; i++) {
+        const file = photoFiles[i];
         const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
         const contentType = PHOTO_CONTENT_TYPES[ext];
         if (!contentType) continue;
@@ -138,7 +152,8 @@ export default function SubmitForm() {
         if (error) continue;
 
         const { data } = supabase.storage.from("route-photos").getPublicUrl(path);
-        photoUrls.push(data.publicUrl);
+        const caption = photoCaptions[i]?.trim() || null;
+        photos.push({ url: data.publicUrl, caption });
       }
 
       const response = await submitRoutePayload({
@@ -156,7 +171,7 @@ export default function SubmitForm() {
         profile: stats.profile,
         bounds,
         track,
-        photoUrls,
+        photos,
       });
       setResult(response);
     });
@@ -256,8 +271,45 @@ export default function SubmitForm() {
           </Field>
 
           <Field label="Photos (optional, max 1MB each)">
-            <input name="photos" type="file" accept="image/*" multiple className={inputClass} />
+            <input
+              name="photos"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoChange}
+              className={inputClass}
+            />
           </Field>
+
+          {photoFiles.length > 0 && (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {photoFiles.map((file, i) => (
+                <div key={i} className="flex flex-col gap-1.5">
+                  <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-forest-soft">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photoPreviewUrls[i]}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Caption (optional)"
+                    maxLength={90}
+                    value={photoCaptions[i] ?? ""}
+                    onChange={(e) =>
+                      setPhotoCaptions((prev) => prev.map((c, idx) => (idx === i ? e.target.value : c)))
+                    }
+                    className={inputClass}
+                  />
+                  <span className="text-right text-[0.65rem] text-parchment/40">
+                    {(photoCaptions[i] ?? "").length}/90
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <button
             type="submit"

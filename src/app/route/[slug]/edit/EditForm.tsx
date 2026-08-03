@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -76,6 +76,25 @@ export default function EditForm({
   const [whyLength, setWhyLength] = useState(whyRecommended.length);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [draftPois, setDraftPois] = useState<DraftPoi[]>([]);
+  const [photoCaptions, setPhotoCaptions] = useState<Record<string, string>>(() =>
+    Object.fromEntries(photos.map((p) => [p.id, p.caption ?? ""]))
+  );
+  const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
+  const [newPhotoCaptions, setNewPhotoCaptions] = useState<string[]>([]);
+
+  const newPhotoPreviewUrls = useMemo(
+    () => newPhotoFiles.map((f) => URL.createObjectURL(f)),
+    [newPhotoFiles]
+  );
+  useEffect(() => {
+    return () => newPhotoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  }, [newPhotoPreviewUrls]);
+
+  function handleNewPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    setNewPhotoFiles(files);
+    setNewPhotoCaptions(files.map(() => ""));
+  }
 
   function handleDelete() {
     if (!window.confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
@@ -105,10 +124,7 @@ export default function EditForm({
     const form = e.currentTarget;
     const formData = new FormData(form);
 
-    const photoFiles = formData
-      .getAll("newPhotos")
-      .filter((f): f is File => f instanceof File && f.size > 0);
-    const oversized = photoFiles.filter((f) => f.size > MAX_PHOTO_BYTES);
+    const oversized = newPhotoFiles.filter((f) => f.size > MAX_PHOTO_BYTES);
     if (oversized.length > 0) {
       const names = oversized
         .map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`)
@@ -187,8 +203,9 @@ export default function EditForm({
       }
 
       const supabase = createSupabaseBrowserClient();
-      const newPhotoUrls: string[] = [];
-      for (const file of photoFiles) {
+      const newPhotos: { url: string; caption: string | null }[] = [];
+      for (let i = 0; i < newPhotoFiles.length; i++) {
+        const file = newPhotoFiles[i];
         const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
         const contentType = PHOTO_CONTENT_TYPES[ext];
         if (!contentType) continue;
@@ -200,7 +217,8 @@ export default function EditForm({
         if (error) continue;
 
         const { data } = supabase.storage.from("route-photos").getPublicUrl(path);
-        newPhotoUrls.push(data.publicUrl);
+        const caption = newPhotoCaptions[i]?.trim() || null;
+        newPhotos.push({ url: data.publicUrl, caption });
       }
 
       const payload = new FormData();
@@ -210,8 +228,13 @@ export default function EditForm({
       payload.set("difficulty", String(formData.get("difficulty") ?? ""));
       payload.set("surface", String(formData.get("surface") ?? ""));
       payload.set("whyRecommended", String(formData.get("whyRecommended") ?? ""));
-      for (const url of newPhotoUrls) payload.append("newPhotoUrls", url);
+      payload.set("newPhotos", JSON.stringify(newPhotos));
       for (const id of removedIds) payload.append("removePhotoIds", id);
+
+      const changedCaptions = photos
+        .filter((p) => !removedIds.has(p.id) && (photoCaptions[p.id] ?? "") !== (p.caption ?? ""))
+        .map((p) => ({ id: p.id, caption: photoCaptions[p.id]?.trim() || null }));
+      payload.set("photoCaptions", JSON.stringify(changedCaptions));
 
       const removePoiIds = draftPois.filter((p) => p.id && p.removed).map((p) => p.id as string);
       const newPois = draftPois
@@ -334,36 +357,85 @@ export default function EditForm({
               <span className="font-heading text-xs font-semibold uppercase tracking-wider text-parchment/70">
                 Current photos
               </span>
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {photos.map((photo) => (
-                  <label
-                    key={photo.id}
-                    className="relative block aspect-square overflow-hidden rounded-lg bg-forest-soft"
-                  >
-                    <Image
-                      src={photo.url}
-                      alt={photo.caption ?? ""}
-                      fill
-                      sizes="33vw"
-                      className={`object-cover ${removedIds.has(photo.id) ? "opacity-30" : ""}`}
-                    />
-                    <span className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-1 bg-forest/80 py-1 text-[0.65rem] uppercase tracking-wide text-parchment">
-                      <input
-                        type="checkbox"
-                        checked={removedIds.has(photo.id)}
-                        onChange={() => toggleRemove(photo.id)}
+                  <div key={photo.id} className="flex flex-col gap-1.5">
+                    <label className="relative block aspect-square overflow-hidden rounded-lg bg-forest-soft">
+                      <Image
+                        src={photo.url}
+                        alt={photoCaptions[photo.id] ?? ""}
+                        fill
+                        sizes="33vw"
+                        className={`object-cover ${removedIds.has(photo.id) ? "opacity-30" : ""}`}
                       />
-                      Remove
+                      <span className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-1 bg-forest/80 py-1 text-[0.65rem] uppercase tracking-wide text-parchment">
+                        <input
+                          type="checkbox"
+                          checked={removedIds.has(photo.id)}
+                          onChange={() => toggleRemove(photo.id)}
+                        />
+                        Remove
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Caption (optional)"
+                      maxLength={90}
+                      value={photoCaptions[photo.id] ?? ""}
+                      onChange={(e) =>
+                        setPhotoCaptions((prev) => ({ ...prev, [photo.id]: e.target.value }))
+                      }
+                      className={inputClass}
+                    />
+                    <span className="text-right text-[0.65rem] text-parchment/40">
+                      {(photoCaptions[photo.id] ?? "").length}/90
                     </span>
-                  </label>
+                  </div>
                 ))}
               </div>
             </div>
           )}
 
           <Field label="Add photos (optional, max 1MB each)">
-            <input name="newPhotos" type="file" accept="image/*" multiple className={inputClass} />
+            <input
+              name="newPhotos"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleNewPhotoChange}
+              className={inputClass}
+            />
           </Field>
+
+          {newPhotoFiles.length > 0 && (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {newPhotoFiles.map((file, i) => (
+                <div key={i} className="flex flex-col gap-1.5">
+                  <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-forest-soft">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={newPhotoPreviewUrls[i]}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Caption (optional)"
+                    maxLength={90}
+                    value={newPhotoCaptions[i] ?? ""}
+                    onChange={(e) =>
+                      setNewPhotoCaptions((prev) => prev.map((c, idx) => (idx === i ? e.target.value : c)))
+                    }
+                    className={inputClass}
+                  />
+                  <span className="text-right text-[0.65rem] text-parchment/40">
+                    {(newPhotoCaptions[i] ?? "").length}/90
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <PoiEditor track={track} initialPois={pois} onChange={setDraftPois} />
 

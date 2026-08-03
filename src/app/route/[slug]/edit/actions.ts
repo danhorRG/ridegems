@@ -20,6 +20,66 @@ interface NewPoiInput {
   url: string | null;
 }
 
+interface NewPhotoInput {
+  url: string;
+  caption: string | null;
+}
+
+function parseNewPhotos(raw: string): { photos: NewPhotoInput[] } | { error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { error: "Invalid photo data." };
+  }
+  if (!Array.isArray(parsed)) return { error: "Invalid photo data." };
+
+  const photos: NewPhotoInput[] = [];
+  for (const item of parsed) {
+    if (typeof item !== "object" || item === null) return { error: "Invalid photo data." };
+    const { url, caption } = item as Record<string, unknown>;
+    if (typeof url !== "string" || !url.trim()) return { error: "Invalid photo data." };
+    if (caption !== null && typeof caption === "string" && caption.length > 90) {
+      return { error: "Photo captions must be 90 characters or fewer." };
+    }
+    photos.push({
+      url,
+      caption: typeof caption === "string" && caption.trim() ? caption.trim() : null,
+    });
+  }
+  return { photos };
+}
+
+interface PhotoCaptionInput {
+  id: string;
+  caption: string | null;
+}
+
+function parsePhotoCaptions(raw: string): { captions: PhotoCaptionInput[] } | { error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { error: "Invalid photo caption data." };
+  }
+  if (!Array.isArray(parsed)) return { error: "Invalid photo caption data." };
+
+  const captions: PhotoCaptionInput[] = [];
+  for (const item of parsed) {
+    if (typeof item !== "object" || item === null) return { error: "Invalid photo caption data." };
+    const { id, caption } = item as Record<string, unknown>;
+    if (typeof id !== "string" || !id.trim()) return { error: "Invalid photo caption data." };
+    if (caption !== null && typeof caption === "string" && caption.length > 90) {
+      return { error: "Photo captions must be 90 characters or fewer." };
+    }
+    captions.push({
+      id,
+      caption: typeof caption === "string" && caption.trim() ? caption.trim() : null,
+    });
+  }
+  return { captions };
+}
+
 function parseNewPois(raw: string): { pois: NewPoiInput[] } | { error: string } {
   let parsed: unknown;
   try {
@@ -155,9 +215,20 @@ export async function updateRouteAction(
   const difficulty = String(formData.get("difficulty") ?? "");
   const surface = String(formData.get("surface") ?? "");
   const whyRecommended = String(formData.get("whyRecommended") ?? "").trim();
-  const newPhotoUrls = formData.getAll("newPhotoUrls").map(String).filter(Boolean);
   const removePhotoIds = formData.getAll("removePhotoIds").map(String).filter(Boolean);
   const removePoiIds = formData.getAll("removePoiIds").map(String).filter(Boolean);
+
+  const parsedPhotos = parseNewPhotos(String(formData.get("newPhotos") ?? "[]"));
+  if ("error" in parsedPhotos) {
+    return { status: "error", message: parsedPhotos.error };
+  }
+  const newPhotos = parsedPhotos.photos;
+
+  const parsedPhotoCaptions = parsePhotoCaptions(String(formData.get("photoCaptions") ?? "[]"));
+  if ("error" in parsedPhotoCaptions) {
+    return { status: "error", message: parsedPhotoCaptions.error };
+  }
+  const photoCaptions = parsedPhotoCaptions.captions;
 
   const parsedPois = parseNewPois(String(formData.get("newPois") ?? "[]"));
   if ("error" in parsedPois) {
@@ -232,18 +303,23 @@ export async function updateRouteAction(
     await db.from("route_photos").delete().in("id", removePhotoIds);
   }
 
-  if (newPhotoUrls.length > 0) {
+  if (newPhotos.length > 0) {
     const { count } = await db
       .from("route_photos")
       .select("id", { count: "exact", head: true })
       .eq("route_id", route.id);
     await db.from("route_photos").insert(
-      newPhotoUrls.map((url, i) => ({
+      newPhotos.map((photo, i) => ({
         route_id: route.id,
-        url,
+        url: photo.url,
+        caption: photo.caption,
         sort_order: (count ?? 0) + i,
       }))
     );
+  }
+
+  for (const { id, caption } of photoCaptions) {
+    await db.from("route_photos").update({ caption }).eq("id", id);
   }
 
   if (removePoiIds.length > 0) {

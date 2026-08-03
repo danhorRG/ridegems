@@ -28,7 +28,7 @@ export interface SubmitRouteInput {
   profile: ElevationProfilePoint[];
   bounds: LngLatBounds;
   track: TrackPoint[];
-  photoUrls: string[];
+  photos: { url: string; caption: string | null }[];
 }
 
 export type SubmitRouteResult = { ok: true; name: string } | { ok: false; message: string };
@@ -84,6 +84,9 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
   if (!Array.isArray(input.coordinates) || input.coordinates.length < 2 || input.distanceKm <= 0) {
     return { ok: false, message: "That GPX file doesn't have enough track points to plot a route." };
   }
+  if (input.photos.some((p) => (p.caption?.length ?? 0) > 90)) {
+    return { ok: false, message: "Photo captions must be 90 characters or fewer." };
+  }
 
   const baseSlug = slugify(name) || "route";
   const id = randomUUID();
@@ -128,11 +131,12 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
     return { ok: false, message: "Could not generate a unique route URL. Try a slightly different name." };
   }
 
-  if (input.photoUrls.length > 0) {
+  if (input.photos.length > 0) {
     await supabase.from("route_photos").insert(
-      input.photoUrls.map((url, i) => ({
+      input.photos.map((photo, i) => ({
         route_id: insertedId,
-        url,
+        url: photo.url,
+        caption: photo.caption,
         sort_order: i,
       }))
     );
