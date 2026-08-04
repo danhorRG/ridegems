@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -79,6 +79,37 @@ export default function EditForm({
   const [photoCaptions, setPhotoCaptions] = useState<Record<string, string>>(() =>
     Object.fromEntries(photos.map((p) => [p.id, p.caption ?? ""]))
   );
+  const [photoOrder, setPhotoOrder] = useState<string[]>(() => photos.map((p) => p.id));
+  const orderedPhotos = useMemo(
+    () => photoOrder.map((id) => photos.find((p) => p.id === id)).filter((p): p is ExistingPhoto => !!p),
+    [photoOrder, photos]
+  );
+  const dragIndexRef = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  function handlePhotoDragStart(index: number) {
+    dragIndexRef.current = index;
+  }
+
+  function handlePhotoDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    setDragOverIndex(index);
+    const from = dragIndexRef.current;
+    if (from === null || from === index) return;
+    setPhotoOrder((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(index, 0, moved);
+      return next;
+    });
+    dragIndexRef.current = index;
+  }
+
+  function handlePhotoDragEnd() {
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
+  }
+
   const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
   const [newPhotoCaptions, setNewPhotoCaptions] = useState<string[]>([]);
 
@@ -236,6 +267,9 @@ export default function EditForm({
         .map((p) => ({ id: p.id, caption: photoCaptions[p.id]?.trim() || null }));
       payload.set("photoCaptions", JSON.stringify(changedCaptions));
 
+      const remainingOrder = photoOrder.filter((id) => !removedIds.has(id));
+      payload.set("photoOrder", JSON.stringify(remainingOrder));
+
       const removePoiIds = draftPois.filter((p) => p.id && p.removed).map((p) => p.id as string);
       const newPois = draftPois
         .filter((p) => !p.id && !p.removed)
@@ -357,17 +391,31 @@ export default function EditForm({
               <span className="font-heading text-xs font-semibold uppercase tracking-wider text-parchment/70">
                 Current photos
               </span>
+              <p className="mt-0.5 text-xs text-parchment/50">Drag photos to reorder them.</p>
               <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {photos.map((photo) => (
-                  <div key={photo.id} className="flex flex-col gap-1.5">
+                {orderedPhotos.map((photo, index) => (
+                  <div
+                    key={photo.id}
+                    draggable
+                    onDragStart={() => handlePhotoDragStart(index)}
+                    onDragOver={(e) => handlePhotoDragOver(e, index)}
+                    onDrop={(e) => e.preventDefault()}
+                    onDragEnd={handlePhotoDragEnd}
+                    className={`flex cursor-grab flex-col gap-1.5 active:cursor-grabbing ${
+                      dragOverIndex === index ? "outline outline-2 outline-amber" : ""
+                    }`}
+                  >
                     <label className="relative block aspect-square overflow-hidden rounded-lg bg-forest-soft">
                       <Image
                         src={photo.url}
                         alt={photoCaptions[photo.id] ?? ""}
                         fill
                         sizes="33vw"
-                        className={`object-cover ${removedIds.has(photo.id) ? "opacity-30" : ""}`}
+                        className={`pointer-events-none object-cover ${removedIds.has(photo.id) ? "opacity-30" : ""}`}
                       />
+                      <span className="absolute left-1 top-1 z-10 rounded bg-forest/80 px-1.5 py-0.5 text-[0.65rem] tracking-wide text-parchment/70">
+                        ⠿
+                      </span>
                       <span className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-1 bg-forest/80 py-1 text-[0.65rem] uppercase tracking-wide text-parchment">
                         <input
                           type="checkbox"

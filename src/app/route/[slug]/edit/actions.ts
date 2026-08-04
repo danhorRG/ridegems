@@ -50,6 +50,19 @@ function parseNewPhotos(raw: string): { photos: NewPhotoInput[] } | { error: str
   return { photos };
 }
 
+function parsePhotoOrder(raw: string): { order: string[] } | { error: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { error: "Invalid photo order data." };
+  }
+  if (!Array.isArray(parsed) || !parsed.every((id) => typeof id === "string" && id.trim())) {
+    return { error: "Invalid photo order data." };
+  }
+  return { order: parsed as string[] };
+}
+
 interface PhotoCaptionInput {
   id: string;
   caption: string | null;
@@ -230,6 +243,12 @@ export async function updateRouteAction(
   }
   const photoCaptions = parsedPhotoCaptions.captions;
 
+  const parsedPhotoOrder = parsePhotoOrder(String(formData.get("photoOrder") ?? "[]"));
+  if ("error" in parsedPhotoOrder) {
+    return { status: "error", message: parsedPhotoOrder.error };
+  }
+  const photoOrder = parsedPhotoOrder.order;
+
   const parsedPois = parseNewPois(String(formData.get("newPois") ?? "[]"));
   if ("error" in parsedPois) {
     return { status: "error", message: parsedPois.error };
@@ -320,6 +339,10 @@ export async function updateRouteAction(
 
   for (const { id, caption } of photoCaptions) {
     await db.from("route_photos").update({ caption }).eq("id", id);
+  }
+
+  for (let i = 0; i < photoOrder.length; i++) {
+    await db.from("route_photos").update({ sort_order: i }).eq("id", photoOrder[i]);
   }
 
   if (removePoiIds.length > 0) {
