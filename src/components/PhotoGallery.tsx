@@ -56,7 +56,7 @@ export default function PhotoGallery({
 
       {openPhoto && (
         <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-[1100] flex flex-col items-center justify-center bg-black/90 p-4"
           onClick={() => setOpenIndex(null)}
         >
           <button
