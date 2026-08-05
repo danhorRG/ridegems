@@ -73,6 +73,7 @@ export default function EditForm({
   const [result, setResult] = useState<EditFormState>(initialState);
   const [pending, startTransition] = useTransition();
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [whyLength, setWhyLength] = useState(whyRecommended.length);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [draftPois, setDraftPois] = useState<DraftPoi[]>([]);
@@ -128,7 +129,11 @@ export default function EditForm({
   }
 
   function handleDelete() {
-    if (!window.confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
+    setShowDeleteConfirm(true);
+  }
+
+  function confirmDelete() {
+    setShowDeleteConfirm(false);
     setDeleting(true);
     startTransition(async () => {
       const response = await deleteRouteAction(slug);
@@ -507,6 +512,40 @@ export default function EditForm({
           )}
         </form>
       </div>
+
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
+        >
+          <div className="w-full max-w-sm rounded-xl border border-rust/40 bg-forest p-6 shadow-xl">
+            <h2 id="delete-confirm-title" className="font-heading text-lg font-semibold text-parchment">
+              Delete this route?
+            </h2>
+            <p className="mt-2 text-sm text-parchment/70">
+              Are you sure you want to permanently delete &ldquo;{name}&rdquo;? This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="rounded-full border border-parchment/20 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-parchment transition-colors hover:bg-parchment/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="rounded-full bg-rust px-4 py-2 text-sm font-semibold uppercase tracking-wide text-forest transition-colors hover:bg-rust/80"
+              >
+                Yes, delete route
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
