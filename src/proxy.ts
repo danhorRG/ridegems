@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { supabaseCookieOptions } from "./lib/supabaseCookieOptions";
 
 // Next.js 16 renamed "middleware" to "proxy" -- this file is the
 // replacement for what would elsewhere be middleware.ts. Refreshes the
@@ -13,6 +14,7 @@ export async function proxy(request: NextRequest) {
   if (!supabaseUrl || !supabaseAnonKey) return response;
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: supabaseCookieOptions,
     cookies: {
       getAll() {
         return request.cookies.getAll();

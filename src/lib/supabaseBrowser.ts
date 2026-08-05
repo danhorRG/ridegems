@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { supabaseCookieOptions } from "./supabaseCookieOptions";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -15,5 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * session in cookies so the server can see who's logged in.
  */
 export function createSupabaseBrowserClient() {
-  return createBrowserClient(supabaseUrl!, supabaseAnonKey!);
+  return createBrowserClient(supabaseUrl!, supabaseAnonKey!, {
+    cookieOptions: supabaseCookieOptions,
+  });
 }
