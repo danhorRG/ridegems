@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
+import { checkRateLimit, rateLimitMessage } from "@/lib/rateLimit";
 
 export interface AccountFormState {
   status: "idle" | "error" | "success";
@@ -63,6 +64,16 @@ export async function updatePasswordAction(
   } = await supabase.auth.getUser();
   if (!user?.email) {
     return { status: "error", message: "Sign in required." };
+  }
+
+  // Throttles a hijacked-but-live session from brute-forcing the current
+  // password to escalate into a full account takeover.
+  const reauthLimit = checkRateLimit(`reauth:user:${user.id}`, {
+    limit: 8,
+    windowSeconds: 15 * 60,
+  });
+  if (!reauthLimit.ok) {
+    return { status: "error", message: rateLimitMessage(reauthLimit) };
   }
 
   // Re-verify the current password before allowing the change -- prevents
