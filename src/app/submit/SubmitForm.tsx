@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { submitRoutePayload, type SubmitFormState } from "./actions";
 import { parseGpx } from "@/lib/gpx";
@@ -47,6 +47,8 @@ export default function SubmitForm() {
   const [whyLength, setWhyLength] = useState(0);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoCaptions, setPhotoCaptions] = useState<string[]>([]);
+  const dragIndexRef = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const photoPreviewUrls = useMemo(
     () => photoFiles.map((f) => URL.createObjectURL(f)),
@@ -60,6 +62,40 @@ export default function SubmitForm() {
     const files = Array.from(e.target.files ?? []);
     setPhotoFiles(files);
     setPhotoCaptions(files.map(() => ""));
+  }
+
+  function movePhoto(from: number, to: number) {
+    if (from === to) return;
+    setPhotoFiles((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setPhotoCaptions((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
+  function handlePhotoDragStart(index: number) {
+    dragIndexRef.current = index;
+  }
+
+  function handlePhotoDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    setDragOverIndex(index);
+    const from = dragIndexRef.current;
+    if (from === null || from === index) return;
+    movePhoto(from, index);
+    dragIndexRef.current = index;
+  }
+
+  function handlePhotoDragEnd() {
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -282,32 +318,50 @@ export default function SubmitForm() {
           </Field>
 
           {photoFiles.length > 0 && (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              {photoFiles.map((file, i) => (
-                <div key={i} className="flex flex-col gap-1.5">
-                  <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-forest-soft">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={photoPreviewUrls[i]}
-                      alt=""
-                      className="absolute inset-0 h-full w-full object-cover"
+            <div>
+              {photoFiles.length > 1 && (
+                <p className="mb-2 text-xs text-parchment/50">Drag photos to reorder them.</p>
+              )}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {photoFiles.map((file, i) => (
+                  <div
+                    key={i}
+                    draggable
+                    onDragStart={() => handlePhotoDragStart(i)}
+                    onDragOver={(e) => handlePhotoDragOver(e, i)}
+                    onDrop={(e) => e.preventDefault()}
+                    onDragEnd={handlePhotoDragEnd}
+                    className={`flex cursor-grab flex-col gap-1.5 active:cursor-grabbing ${
+                      dragOverIndex === i ? "outline outline-2 outline-amber" : ""
+                    }`}
+                  >
+                    <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-forest-soft">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photoPreviewUrls[i]}
+                        alt=""
+                        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+                      />
+                      <span className="absolute left-1 top-1 z-10 rounded bg-forest/80 px-1.5 py-0.5 text-[0.65rem] tracking-wide text-parchment/70">
+                        ⠿
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Caption (optional)"
+                      maxLength={90}
+                      value={photoCaptions[i] ?? ""}
+                      onChange={(e) =>
+                        setPhotoCaptions((prev) => prev.map((c, idx) => (idx === i ? e.target.value : c)))
+                      }
+                      className={inputClass}
                     />
+                    <span className="text-right text-[0.65rem] text-parchment/40">
+                      {(photoCaptions[i] ?? "").length}/90
+                    </span>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Caption (optional)"
-                    maxLength={90}
-                    value={photoCaptions[i] ?? ""}
-                    onChange={(e) =>
-                      setPhotoCaptions((prev) => prev.map((c, idx) => (idx === i ? e.target.value : c)))
-                    }
-                    className={inputClass}
-                  />
-                  <span className="text-right text-[0.65rem] text-parchment/40">
-                    {(photoCaptions[i] ?? "").length}/90
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
