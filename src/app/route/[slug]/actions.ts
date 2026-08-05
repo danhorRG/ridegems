@@ -92,10 +92,21 @@ export async function addCommentAction(
     return { status: "error", message: "Route not found." };
   }
 
+  // Never store the account's login email as the public comment author --
+  // route_comments is publicly readable with no auth required (see
+  // supabase/schema-003-recommendations-comments.sql), so an email here
+  // would be scraped by anyone. Use the display name collected at signup
+  // instead; a DB trigger (schema-012) re-derives this server-side too, so
+  // a future regression here can't leak it again.
+  const displayName =
+    typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name.trim()
+      ? user.user_metadata.full_name.trim()
+      : "Rider";
+
   const { error } = await supabase.from("route_comments").insert({
     route_id: routeId,
     user_id: user.id,
-    author_name: user.email ?? "Rider",
+    author_name: displayName,
     body,
   });
   if (error) {
