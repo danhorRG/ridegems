@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   MapContainer,
@@ -14,13 +14,126 @@ import {
 import type { LatLngTuple } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Route } from "@/types/route";
-import type { LngLatBounds } from "@/lib/geo";
+import { boundsIntersect, haversineMeters, type LngLatBounds } from "@/lib/geo";
 
-const DIFFICULTY_COLORS: Record<string, string> = {
-  easy: "#6B8F71",
-  moderate: "#E8A33D",
-  hard: "#C1542C",
-};
+interface PaletteColor {
+  hex: string;
+  /** Approximate hue in degrees, used to score how different two colors look. */
+  hue: number;
+}
+
+/**
+ * Ten hand-tuned colors matching the site's muted trail-map palette
+ * (rust/amber/moss are the existing brand accents), spaced ~35-40° apart
+ * around the hue wheel so any two are easy to tell apart at a glance.
+ */
+const ROUTE_PALETTE: PaletteColor[] = [
+  { hex: "#C1542C", hue: 14 }, // rust
+  { hex: "#E8A33D", hue: 36 }, // amber
+  { hex: "#768F3D", hue: 78 }, // olive
+  { hex: "#6B8F71", hue: 127 }, // moss
+  { hex: "#3C8670", hue: 162 }, // pine
+  { hex: "#3E7F98", hue: 197 }, // lagoon
+  { hex: "#50599B", hue: 233 }, // slate
+  { hex: "#78569F", hue: 268 }, // violet
+  { hex: "#8D498A", hue: 303 }, // plum
+  { hex: "#9D4363", hue: 339 }, // berry
+];
+
+/** Deterministic djb2-style string hash, used to break ties reproducibly. */
+function hashString(value: string): number {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 33) ^ value.charCodeAt(i);
+  }
+  return Math.abs(hash);
+}
+
+function hueDistance(a: number, b: number): number {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
+/** Above this many points per route, proximity checks sample down for speed. */
+const MAX_OVERLAP_SAMPLE_POINTS = 60;
+/** Routes with any two points closer than this are treated as overlapping/adjacent. */
+const OVERLAP_PROXIMITY_M = 250;
+
+function sampleCoords(coords: [number, number][]): [number, number][] {
+  if (coords.length <= MAX_OVERLAP_SAMPLE_POINTS) return coords;
+  const stride = Math.ceil(coords.length / MAX_OVERLAP_SAMPLE_POINTS);
+  return coords.filter((_, i) => i % stride === 0);
+}
+
+/**
+ * Cheap bounding-box check first, then a point-proximity pass, to decide
+ * whether two routes share or run alongside the same road — the case where
+ * their line colors need to read as clearly different on the map.
+ */
+function routesOverlap(a: Route, b: Route): boolean {
+  if (!boundsIntersect(a.bounds, b.bounds)) return false;
+  const aPts = sampleCoords(a.coordinates);
+  const bPts = sampleCoords(b.coordinates);
+  for (const [aLon, aLat] of aPts) {
+    for (const [bLon, bLat] of bPts) {
+      if (haversineMeters({ lat: aLat, lon: aLon }, { lat: bLat, lon: bLon }) < OVERLAP_PROXIMITY_M) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Picks the palette color that is farthest (in hue) from every given neighbor hue. */
+function pickColor(routeId: string, neighborHues: number[]): PaletteColor {
+  if (neighborHues.length === 0) {
+    return ROUTE_PALETTE[hashString(routeId) % ROUTE_PALETTE.length];
+  }
+  let best: PaletteColor[] = [];
+  let bestScore = -1;
+  for (const candidate of ROUTE_PALETTE) {
+    const score = Math.min(...neighborHues.map((hue) => hueDistance(candidate.hue, hue)));
+    if (score > bestScore) {
+      bestScore = score;
+      best = [candidate];
+    } else if (score === bestScore) {
+      best.push(candidate);
+    }
+  }
+  return best[hashString(routeId) % best.length];
+}
+
+/**
+ * Assigns each route a palette color, in ascending `createdAt` order, so a
+ * newly added route automatically picks a color as different as possible
+ * from any existing route it geographically overlaps — while never
+ * reshuffling colors already assigned to older routes.
+ */
+function assignRouteColors(routes: Route[]): Map<string, string> {
+  const sorted = [...routes].sort((a, b) => {
+    const byDate = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+    return byDate !== 0 ? byDate : a.id.localeCompare(b.id);
+  });
+
+  const assignedHue = new Map<string, number>();
+  const colorMap = new Map<string, string>();
+
+  for (const route of sorted) {
+    const neighborHues: number[] = [];
+    for (const other of sorted) {
+      if (other === route) break;
+      const hue = assignedHue.get(other.id);
+      if (hue !== undefined && routesOverlap(route, other)) {
+        neighborHues.push(hue);
+      }
+    }
+    const color = pickColor(route.id, neighborHues);
+    assignedHue.set(route.id, color.hue);
+    colorMap.set(route.id, color.hex);
+  }
+
+  return colorMap;
+}
 
 function toLatLngs(coords: [number, number][]): LatLngTuple[] {
   return coords.map(([lon, lat]) => [lat, lon]);
@@ -135,6 +248,7 @@ export default function MapView({
 }: MapViewProps) {
   const lastMapOriginatedId = useRef<string | null>(null);
   const apiKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
+  const routeColors = useMemo(() => assignRouteColors(routes), [routes]);
 
   if (!apiKey) {
     return (
@@ -194,7 +308,7 @@ export default function MapView({
             <Polyline
               positions={positions}
               pathOptions={{
-                color: DIFFICULTY_COLORS[route.difficulty] ?? "#E8A33D",
+                color: routeColors.get(route.id) ?? "#E8A33D",
                 weight: selected ? 5 : 3,
                 interactive: false,
               }}
