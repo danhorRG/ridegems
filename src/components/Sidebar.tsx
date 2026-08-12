@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import FilterPanel from "./FilterPanel";
+import NewsletterSignup from "./NewsletterSignup";
 import RouteCard from "./RouteCard";
 import { signOutAction } from "@/app/login/actions";
 import type { FilterState, SortMode } from "@/lib/filters";
@@ -87,7 +88,7 @@ export default function Sidebar({
       />
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden rounded-t-2xl bg-parchment shadow-[0_-8px_30px_rgba(0,0,0,0.4)] transition-[max-height] duration-200 ease-out md:absolute md:inset-y-0 md:left-0 md:right-auto md:bottom-auto md:z-auto md:h-auto md:w-80 md:max-h-none md:rounded-none md:shadow-none ${
+        className={`fixed inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden rounded-t-2xl bg-parchment shadow-[0_-8px_30px_rgba(0,0,0,0.4)] transition-[max-height] duration-200 ease-out md:absolute md:inset-y-0 md:left-0 md:right-auto md:z-auto md:h-auto md:w-80 md:max-h-none md:rounded-none md:shadow-none ${
           open ? "max-h-[85vh]" : "max-h-[112px]"
         }`}
       >
@@ -141,7 +142,7 @@ export default function Sidebar({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:pb-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:pb-5">
           <div className="mb-4 flex items-center justify-between gap-2 md:hidden">
             <AuthStatus userName={userName} />
           </div>
@@ -201,6 +202,8 @@ export default function Sidebar({
               />
             ))}
           </div>
+
+          <NewsletterSignup />
 
           <Link
             href="/about"
