@@ -88,28 +88,33 @@ export default function Sidebar({
 
       <div
         className={`fixed inset-x-0 bottom-0 z-30 flex flex-col overflow-hidden rounded-t-2xl bg-parchment shadow-[0_-8px_30px_rgba(0,0,0,0.4)] transition-[max-height] duration-200 ease-out md:absolute md:inset-y-0 md:left-0 md:right-auto md:bottom-auto md:z-auto md:h-auto md:w-80 md:max-h-none md:rounded-none md:shadow-none ${
-          open ? "max-h-[85vh]" : "max-h-[60px]"
+          open ? "max-h-[85vh]" : "max-h-[112px]"
         }`}
       >
         <button
           type="button"
           onClick={() => onOpenChange(!open)}
-          className="flex shrink-0 items-center justify-between gap-3 px-5 py-4 md:hidden"
+          className="flex shrink-0 flex-col gap-1 px-5 py-3 text-left md:hidden"
         >
-          <span className="font-heading text-xl font-bold uppercase tracking-wider text-forest">
-            RideGems
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="font-stats text-xs text-forest/60">
-              {displayedRoutes.length}/{totalCount} routes
+          <span className="flex items-center justify-between gap-3">
+            <span className="font-heading text-xl font-bold uppercase tracking-wider text-forest">
+              RideGems
             </span>
-            <svg
-              viewBox="0 0 20 20"
-              className={`h-4 w-4 text-forest/60 transition-transform ${open ? "rotate-180" : ""}`}
-              fill="currentColor"
-            >
-              <path d="M5 7l5 6 5-6H5z" />
-            </svg>
+            <span className="flex items-center gap-2">
+              <span className="font-stats text-xs text-forest/60">
+                {displayedRoutes.length}/{totalCount} routes
+              </span>
+              <svg
+                viewBox="0 0 20 20"
+                className={`h-4 w-4 text-forest/60 transition-transform ${open ? "rotate-180" : ""}`}
+                fill="currentColor"
+              >
+                <path d="M5 7l5 6 5-6H5z" />
+              </svg>
+            </span>
+          </span>
+          <span className="text-xs leading-snug text-forest/70">
+            Cycling routes worth the trip &mdash; curated by the people who rode them.
           </span>
         </button>
 
@@ -120,6 +125,9 @@ export default function Sidebar({
             </span>
             <AuthStatus userName={userName} className="mt-1.5" />
           </div>
+          <p className="mt-2 text-sm leading-snug text-forest/70">
+            Cycling routes worth the trip &mdash; curated by the people who rode them.
+          </p>
           <div className="mt-2 flex items-center justify-between gap-2">
             <span className="font-stats text-xs text-forest/60">
               {displayedRoutes.length} of {visibleCount} routes in view
