@@ -34,7 +34,7 @@ export default async function EditRoutePage({
   // service-role client) so they can open and moderate any route.
   const { data: route } = await (admin ? createSupabaseAdminClient() : supabase)
     .from("routes")
-    .select("id,slug,name,description,difficulty,surface,why_recommended,created_by,track_points")
+    .select("id,slug,name,description,difficulty,surface,ride_type,why_recommended,created_by,track_points")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -54,6 +54,7 @@ export default async function EditRoutePage({
       description={route.description ?? ""}
       difficulty={route.difficulty}
       surface={route.surface}
+      rideType={route.ride_type}
       whyRecommended={route.why_recommended ?? ""}
       photos={(photos ?? []).map((p) => ({ id: p.id, url: p.url, caption: p.caption }))}
       track={route.track_points ?? []}

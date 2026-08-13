@@ -52,6 +52,7 @@ export default function EditForm({
   description,
   difficulty,
   surface,
+  rideType,
   whyRecommended,
   photos,
   track,
@@ -63,6 +64,7 @@ export default function EditForm({
   description: string;
   difficulty: string;
   surface: string;
+  rideType: string;
   whyRecommended: string;
   photos: ExistingPhoto[];
   track: TrackPoint[];
@@ -75,6 +77,8 @@ export default function EditForm({
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [whyLength, setWhyLength] = useState(whyRecommended.length);
+  const [rideTypeValue, setRideTypeValue] = useState(rideType);
+  const [difficultyValue, setDifficultyValue] = useState(difficulty);
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
   const [draftPois, setDraftPois] = useState<DraftPoi[]>([]);
   const [photoCaptions, setPhotoCaptions] = useState<Record<string, string>>(() =>
@@ -121,6 +125,13 @@ export default function EditForm({
   useEffect(() => {
     return () => newPhotoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
   }, [newPhotoPreviewUrls]);
+
+  function handleRideTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const value = e.target.value;
+    setRideTypeValue(value);
+    // Difficulty ratings aren't meaningful for family rides -- lock it to "easy".
+    if (value === "family") setDifficultyValue("easy");
+  }
 
   function handleNewPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -261,8 +272,14 @@ export default function EditForm({
       payload.set("slug", slug);
       payload.set("name", String(formData.get("name") ?? ""));
       payload.set("description", String(formData.get("description") ?? ""));
-      payload.set("difficulty", String(formData.get("difficulty") ?? ""));
+      // The difficulty <select> is disabled (and excluded from FormData) for
+      // family rides, since difficulty ratings aren't meaningful for them.
+      payload.set(
+        "difficulty",
+        rideTypeValue === "family" ? "easy" : String(formData.get("difficulty") ?? "")
+      );
       payload.set("surface", String(formData.get("surface") ?? ""));
+      payload.set("rideType", String(formData.get("rideType") ?? ""));
       payload.set("whyRecommended", String(formData.get("whyRecommended") ?? ""));
       payload.set("newPhotos", JSON.stringify(newPhotos));
       for (const id of removedIds) payload.append("removePhotoIds", id);
@@ -352,8 +369,28 @@ export default function EditForm({
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
+            <Field label="Ride Type">
+              <select
+                name="rideType"
+                required
+                value={rideTypeValue}
+                onChange={handleRideTypeChange}
+                className={inputClass}
+              >
+                <option value="sportive">Sportive</option>
+                <option value="family">Family</option>
+              </select>
+            </Field>
             <Field label="Difficulty">
-              <select name="difficulty" required defaultValue={difficulty} className={inputClass}>
+              <select
+                name="difficulty"
+                required
+                value={difficultyValue}
+                onChange={(e) => setDifficultyValue(e.target.value)}
+                disabled={rideTypeValue === "family"}
+                title={rideTypeValue === "family" ? "Not applicable for family rides" : undefined}
+                className={`${inputClass} ${rideTypeValue === "family" ? "cursor-not-allowed opacity-40" : ""}`}
+              >
                 <option value="easy">Easy</option>
                 <option value="moderate">Moderate</option>
                 <option value="hard">Hard</option>

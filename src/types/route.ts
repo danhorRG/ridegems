@@ -2,6 +2,7 @@ import type { ElevationProfilePoint, LngLatBounds, TrackPoint } from "@/lib/geo"
 
 export type Difficulty = "easy" | "moderate" | "hard";
 export type Surface = "paved" | "gravel" | "mtb";
+export type RideType = "sportive" | "family";
 export type PoiCategory =
   | "viewpoint"
   | "water"
@@ -18,6 +19,7 @@ export interface Route {
   name: string;
   difficulty: Difficulty;
   surface: Surface;
+  rideType: RideType;
   distanceKm: number;
   elevationGainM: number;
   elevationLossM: number;

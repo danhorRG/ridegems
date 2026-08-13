@@ -45,6 +45,8 @@ export default function SubmitForm() {
   const [result, setResult] = useState<SubmitFormState>(initialState);
   const [pending, startTransition] = useTransition();
   const [whyLength, setWhyLength] = useState(0);
+  const [rideType, setRideType] = useState("");
+  const [difficulty, setDifficulty] = useState("");
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoCaptions, setPhotoCaptions] = useState<string[]>([]);
   const dragIndexRef = useRef<number | null>(null);
@@ -57,6 +59,13 @@ export default function SubmitForm() {
   useEffect(() => {
     return () => photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
   }, [photoPreviewUrls]);
+
+  function handleRideTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const value = e.target.value;
+    setRideType(value);
+    // Difficulty ratings aren't meaningful for family rides -- lock it to "easy".
+    if (value === "family") setDifficulty("easy");
+  }
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -195,8 +204,11 @@ export default function SubmitForm() {
       const response = await submitRoutePayload({
         name: String(formData.get("name") ?? ""),
         description: String(formData.get("description") ?? ""),
-        difficulty: String(formData.get("difficulty") ?? ""),
+        // The difficulty <select> is disabled (and excluded from FormData) for
+        // family rides, since difficulty ratings aren't meaningful for them.
+        difficulty: rideType === "family" ? "easy" : String(formData.get("difficulty") ?? ""),
         surface: String(formData.get("surface") ?? ""),
+        rideType: String(formData.get("rideType") ?? ""),
         whyRecommended: String(formData.get("whyRecommended") ?? ""),
         distanceKm,
         elevationGainM: stats.elevationGainM,
@@ -269,8 +281,31 @@ export default function SubmitForm() {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
+            <Field label="Ride Type">
+              <select
+                name="rideType"
+                required
+                value={rideType}
+                onChange={handleRideTypeChange}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  Choose one
+                </option>
+                <option value="sportive">Sportive</option>
+                <option value="family">Family</option>
+              </select>
+            </Field>
             <Field label="Difficulty">
-              <select name="difficulty" required defaultValue="" className={inputClass}>
+              <select
+                name="difficulty"
+                required
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value)}
+                disabled={rideType === "family"}
+                title={rideType === "family" ? "Not applicable for family rides" : undefined}
+                className={`${inputClass} ${rideType === "family" ? "cursor-not-allowed opacity-40" : ""}`}
+              >
                 <option value="" disabled>
                   Choose one
                 </option>

@@ -328,7 +328,7 @@ export default function MapView({
                 <div className="rg-popup-name">{route.name}</div>
                 <div className="rg-popup-stats">
                   {route.distanceKm} km &middot; {route.elevationGainM} m gain &middot;{" "}
-                  {route.difficulty} &middot; {route.surface}
+                  {route.difficulty} &middot; {route.surface} &middot; {route.rideType}
                 </div>
                 <Link href={`/route/${route.id}`} className="rg-popup-link">
                   View details &rarr;

@@ -1,13 +1,14 @@
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import type { Difficulty, PoiCategory, Route, RouteDetail, Surface } from "@/types/route";
+import type { Difficulty, PoiCategory, RideType, Route, RouteDetail, Surface } from "@/types/route";
 
 interface RouteRow {
   slug: string;
   name: string;
   difficulty: string;
   surface: string;
+  ride_type: string;
   distance_km: number;
   elevation_gain_m: number;
   elevation_loss_m: number;
@@ -26,6 +27,7 @@ function rowToRoute(row: RouteRow): Route {
     name: row.name,
     difficulty: row.difficulty as Difficulty,
     surface: row.surface as Surface,
+    rideType: row.ride_type as RideType,
     distanceKm: row.distance_km,
     elevationGainM: row.elevation_gain_m,
     elevationLossM: row.elevation_loss_m,
@@ -40,7 +42,7 @@ function rowToRoute(row: RouteRow): Route {
 }
 
 const ROUTE_COLUMNS =
-  "slug,name,difficulty,surface,distance_km,elevation_gain_m,elevation_loss_m,min_elevation_m,max_elevation_m,coordinates,profile,bounds,recommendation_count,created_at";
+  "slug,name,difficulty,surface,ride_type,distance_km,elevation_gain_m,elevation_loss_m,min_elevation_m,max_elevation_m,coordinates,profile,bounds,recommendation_count,created_at";
 
 export async function getRoutes(): Promise<Route[]> {
   const { data, error } = await supabase

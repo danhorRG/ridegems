@@ -52,6 +52,16 @@ const DIFFICULTY_BADGE: Record<string, string> = {
   hard: "bg-rust text-parchment",
 };
 
+const RIDE_TYPE_BADGE: Record<string, string> = {
+  sportive: "bg-forest-soft text-parchment border border-parchment/30",
+  family: "bg-moss text-forest",
+};
+
+const RIDE_TYPE_LABEL: Record<string, string> = {
+  sportive: "Sportive",
+  family: "Family",
+};
+
 export default async function RouteDetailPage({
   params,
 }: {
@@ -93,11 +103,18 @@ export default async function RouteDetailPage({
           <h1 className="font-heading text-2xl font-bold uppercase tracking-wide text-parchment sm:text-3xl">
             {route.name}
           </h1>
-          <span
-            className={`shrink-0 rounded px-2 py-1 text-xs font-semibold uppercase tracking-wide ${DIFFICULTY_BADGE[route.difficulty]}`}
-          >
-            {route.difficulty}
-          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span
+              className={`rounded px-2 py-1 text-xs font-semibold uppercase tracking-wide ${DIFFICULTY_BADGE[route.difficulty]}`}
+            >
+              {route.difficulty}
+            </span>
+            <span
+              className={`rounded px-2 py-1 text-xs font-semibold uppercase tracking-wide ${RIDE_TYPE_BADGE[route.rideType]}`}
+            >
+              {RIDE_TYPE_LABEL[route.rideType]}
+            </span>
+          </div>
         </div>
 
         {user && (route.createdBy === user.id || isAdminUser(user)) && (

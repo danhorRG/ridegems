@@ -9,6 +9,11 @@ const DIFFICULTY_BADGE: Record<Route["difficulty"], string> = {
   hard: "bg-rust text-parchment",
 };
 
+const RIDE_TYPE_LABEL: Record<Route["rideType"], string> = {
+  sportive: "Sportive",
+  family: "Family",
+};
+
 export default function RouteCard({
   route,
   selected,
@@ -50,6 +55,9 @@ export default function RouteCard({
           </span>
           <span className="rounded border border-forest/20 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-forest/50">
             {route.surface}
+          </span>
+          <span className="rounded border border-forest/20 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-forest/50">
+            {RIDE_TYPE_LABEL[route.rideType]}
           </span>
         </div>
       </button>

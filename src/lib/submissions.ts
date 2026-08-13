@@ -1,10 +1,11 @@
 import { randomUUID } from "crypto";
 import { createSupabaseServerClient } from "./supabaseServer";
-import type { Difficulty, Surface } from "@/types/route";
+import type { Difficulty, RideType, Surface } from "@/types/route";
 import type { ElevationProfilePoint, LngLatBounds, TrackPoint } from "./geo";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "moderate", "hard"];
 const SURFACES: Surface[] = ["paved", "gravel", "mtb"];
+const RIDE_TYPES: RideType[] = ["sportive", "family"];
 
 function slugify(name: string): string {
   return name
@@ -18,6 +19,7 @@ export interface SubmitRouteInput {
   description: string;
   difficulty: string;
   surface: string;
+  rideType: string;
   whyRecommended: string;
   distanceKm: number;
   elevationGainM: number;
@@ -81,6 +83,9 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
   if (!SURFACES.includes(input.surface as Surface)) {
     return { ok: false, message: "Choose a valid surface." };
   }
+  if (!RIDE_TYPES.includes(input.rideType as RideType)) {
+    return { ok: false, message: "Choose a valid ride type." };
+  }
   if (!Array.isArray(input.coordinates) || input.coordinates.length < 2 || input.distanceKm <= 0) {
     return { ok: false, message: "That GPX file doesn't have enough track points to plot a route." };
   }
@@ -100,6 +105,7 @@ export async function submitRoute(input: SubmitRouteInput): Promise<SubmitRouteR
       name,
       difficulty: input.difficulty,
       surface: input.surface,
+      ride_type: input.rideType,
       distance_km: Math.round(input.distanceKm * 10) / 10,
       elevation_gain_m: input.elevationGainM,
       elevation_loss_m: input.elevationLossM,

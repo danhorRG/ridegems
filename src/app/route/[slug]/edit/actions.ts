@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { createSupabaseAdminClient } from "@/lib/supabaseAdmin";
 import { isAdminUser } from "@/lib/admin";
-import type { Difficulty, PoiCategory, Surface } from "@/types/route";
+import type { Difficulty, PoiCategory, RideType, Surface } from "@/types/route";
 import type { ElevationProfilePoint, LngLatBounds, TrackPoint } from "@/lib/geo";
 import { POI_CATEGORIES } from "@/lib/poi";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "moderate", "hard"];
 const SURFACES: Surface[] = ["paved", "gravel", "mtb"];
+const RIDE_TYPES: RideType[] = ["sportive", "family"];
 
 interface NewPoiInput {
   name: string;
@@ -227,6 +228,7 @@ export async function updateRouteAction(
   const description = String(formData.get("description") ?? "").trim();
   const difficulty = String(formData.get("difficulty") ?? "");
   const surface = String(formData.get("surface") ?? "");
+  const rideType = String(formData.get("rideType") ?? "");
   const whyRecommended = String(formData.get("whyRecommended") ?? "").trim();
   const removePhotoIds = formData.getAll("removePhotoIds").map(String).filter(Boolean);
   const removePoiIds = formData.getAll("removePoiIds").map(String).filter(Boolean);
@@ -275,6 +277,9 @@ export async function updateRouteAction(
   if (!SURFACES.includes(surface as Surface)) {
     return { status: "error", message: "Choose a valid surface." };
   }
+  if (!RIDE_TYPES.includes(rideType as RideType)) {
+    return { status: "error", message: "Choose a valid ride type." };
+  }
 
   // Ownership check happens twice on purpose (for non-admins): the RLS
   // update policy (auth.uid() = created_by) enforces it at the database
@@ -300,6 +305,7 @@ export async function updateRouteAction(
       description,
       difficulty,
       surface,
+      ride_type: rideType,
       why_recommended: whyRecommended,
       ...(gpx && {
         distance_km: Math.round(gpx.distanceKm * 10) / 10,

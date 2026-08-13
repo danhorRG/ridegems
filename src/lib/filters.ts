@@ -1,14 +1,17 @@
-import type { Difficulty, Route, Surface } from "@/types/route";
+import type { Difficulty, RideType, Route, Surface } from "@/types/route";
 
 export interface FilterState {
   difficulties: Difficulty[];
   surfaces: Surface[];
+  /** Single-select, unlike difficulties/surfaces — the map always shows exactly one ride type. */
+  rideType: RideType;
   maxDistanceKm: number;
   maxElevationGainM: number;
 }
 
 export const ALL_DIFFICULTIES: Difficulty[] = ["easy", "moderate", "hard"];
 export const ALL_SURFACES: Surface[] = ["paved", "gravel", "mtb"];
+export const ALL_RIDE_TYPES: RideType[] = ["sportive", "family"];
 
 export function defaultFilterState(routes: Route[]): FilterState {
   const distances = routes.map((r) => r.distanceKm);
@@ -16,6 +19,7 @@ export function defaultFilterState(routes: Route[]): FilterState {
   return {
     difficulties: [...ALL_DIFFICULTIES],
     surfaces: [...ALL_SURFACES],
+    rideType: "sportive",
     maxDistanceKm: distances.length ? Math.max(...distances) : 0,
     maxElevationGainM: gains.length ? Math.max(...gains) : 0,
   };
@@ -25,6 +29,7 @@ export function routeMatchesFilters(route: Route, filters: FilterState): boolean
   return (
     filters.difficulties.includes(route.difficulty) &&
     filters.surfaces.includes(route.surface) &&
+    route.rideType === filters.rideType &&
     route.distanceKm <= filters.maxDistanceKm &&
     route.elevationGainM <= filters.maxElevationGainM
   );

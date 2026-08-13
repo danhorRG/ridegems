@@ -1,8 +1,8 @@
 "use client";
 
-import { ALL_DIFFICULTIES, ALL_SURFACES, toggleValue } from "@/lib/filters";
+import { ALL_DIFFICULTIES, ALL_RIDE_TYPES, ALL_SURFACES, toggleValue } from "@/lib/filters";
 import type { FilterState } from "@/lib/filters";
-import type { Difficulty, Surface } from "@/types/route";
+import type { Difficulty, RideType, Surface } from "@/types/route";
 
 const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   easy: "Easy",
@@ -16,6 +16,11 @@ const SURFACE_LABELS: Record<Surface, string> = {
   mtb: "MTB",
 };
 
+const RIDE_TYPE_LABELS: Record<RideType, string> = {
+  sportive: "Sportive",
+  family: "Family",
+};
+
 interface FilterPanelProps {
   filters: FilterState;
   onChange: (next: FilterState) => void;
@@ -26,19 +31,25 @@ interface FilterPanelProps {
 function Chip({
   active,
   onClick,
+  disabled,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       aria-pressed={active}
+      aria-disabled={disabled}
+      disabled={disabled}
       onClick={onClick}
       className={`min-h-9 rounded-full border px-3.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
-        active
+        disabled
+          ? "cursor-not-allowed border-forest/10 bg-transparent text-forest/30"
+          : active
           ? "border-amber bg-amber text-forest"
           : "border-forest/20 bg-transparent text-forest/70 hover:border-forest/40"
       }`}
@@ -66,6 +77,31 @@ export default function FilterPanel({ filters, onChange, onReset, bounds }: Filt
 
       <section>
         <h3 className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wider text-forest/50">
+          Ride Type
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {ALL_RIDE_TYPES.map((rt) => (
+            <Chip
+              key={rt}
+              active={filters.rideType === rt}
+              onClick={() =>
+                onChange({
+                  ...filters,
+                  rideType: rt,
+                  // Difficulty isn't meaningful for family rides -- nullify any
+                  // narrowed selection so the (now-disabled) filter can't hide them.
+                  difficulties: rt === "family" ? [...ALL_DIFFICULTIES] : filters.difficulties,
+                })
+              }
+            >
+              {RIDE_TYPE_LABELS[rt]}
+            </Chip>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wider text-forest/50">
           Difficulty
         </h3>
         <div className="flex flex-wrap gap-2">
@@ -73,6 +109,7 @@ export default function FilterPanel({ filters, onChange, onReset, bounds }: Filt
             <Chip
               key={d}
               active={filters.difficulties.includes(d)}
+              disabled={filters.rideType === "family"}
               onClick={() =>
                 onChange({ ...filters, difficulties: toggleValue(filters.difficulties, d) })
               }

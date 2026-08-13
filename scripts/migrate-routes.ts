@@ -51,6 +51,7 @@ async function main() {
           name: route.name,
           difficulty: route.difficulty,
           surface: route.surface,
+          ride_type: route.rideType,
           distance_km: route.distanceKm,
           elevation_gain_m: route.elevationGainM,
           elevation_loss_m: route.elevationLossM,
