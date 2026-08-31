@@ -153,6 +153,12 @@ function LoginForm() {
               </span>
               <input name="password" type="password" required minLength={6} className={inputClass} />
             </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="font-heading text-xs font-semibold uppercase tracking-wider text-parchment/70">
+                Confirm password
+              </span>
+              <input name="confirmPassword" type="password" required minLength={6} className={inputClass} />
+            </label>
             <button
               type="submit"
               disabled={signUpPending}

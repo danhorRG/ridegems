@@ -55,8 +55,9 @@ export async function signUpAction(
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
-  if (!name || !email || !password) {
+  if (!name || !email || !password || !confirmPassword) {
     return { status: "error", message: "Name, email, and password are required." };
   }
   if (name.length > 80) {
@@ -64,6 +65,9 @@ export async function signUpAction(
   }
   if (password.length < 6) {
     return { status: "error", message: "Password must be at least 6 characters." };
+  }
+  if (password !== confirmPassword) {
+    return { status: "error", message: "Passwords do not match." };
   }
 
   const ip = await getClientIp();
