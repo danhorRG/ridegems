@@ -18,7 +18,9 @@ export function defaultFilterState(routes: Route[]): FilterState {
   const gains = routes.map((r) => r.elevationGainM);
   return {
     difficulties: [...ALL_DIFFICULTIES],
-    surfaces: [...ALL_SURFACES],
+    // Paved + Gravel by default -- MTB is mutually exclusive with both, so
+    // all three can't start selected together.
+    surfaces: ["paved", "gravel"],
     rideType: "sportive",
     maxDistanceKm: distances.length ? Math.max(...distances) : 0,
     maxElevationGainM: gains.length ? Math.max(...gains) : 0,
@@ -37,6 +39,20 @@ export function routeMatchesFilters(route: Route, filters: FilterState): boolean
 
 export function toggleValue<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+/**
+ * Surface toggle with MTB treated as mutually exclusive with Paved/Gravel:
+ * enabling MTB clears Paved/Gravel, and enabling Paved or Gravel clears MTB.
+ */
+export function toggleSurface(current: Surface[], value: Surface): Surface[] {
+  if (current.includes(value)) {
+    return current.filter((s) => s !== value);
+  }
+  if (value === "mtb") {
+    return ["mtb"];
+  }
+  return [...current.filter((s) => s !== "mtb"), value];
 }
 
 export type SortMode = "recommended" | "recent";

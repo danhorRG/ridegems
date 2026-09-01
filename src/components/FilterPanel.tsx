@@ -1,6 +1,6 @@
 "use client";
 
-import { ALL_DIFFICULTIES, ALL_RIDE_TYPES, ALL_SURFACES, toggleValue } from "@/lib/filters";
+import { ALL_DIFFICULTIES, ALL_RIDE_TYPES, ALL_SURFACES, toggleSurface, toggleValue } from "@/lib/filters";
 import type { FilterState } from "@/lib/filters";
 import type { Difficulty, RideType, Surface } from "@/types/route";
 
@@ -129,7 +129,7 @@ export default function FilterPanel({ filters, onChange, onReset, bounds }: Filt
             <Chip
               key={s}
               active={filters.surfaces.includes(s)}
-              onClick={() => onChange({ ...filters, surfaces: toggleValue(filters.surfaces, s) })}
+              onClick={() => onChange({ ...filters, surfaces: toggleSurface(filters.surfaces, s) })}
             >
               {SURFACE_LABELS[s]}
             </Chip>
